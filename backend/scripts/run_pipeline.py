@@ -295,7 +295,12 @@ async def run(
             )
         async with SessionLocal() as session:
             stats["notice_links"] = await timeboxed(
-                "notice_links", resolve_notice_links(session, fetcher), budget.left(5 * 60), stopped
+                # The 30-minute notices run (notices.yml) does this; a minute here only
+                # catches up if that run is off.
+                "notice_links",
+                resolve_notice_links(session, fetcher),
+                budget.left(60),
+                stopped,
             )
 
         ingested = 0
