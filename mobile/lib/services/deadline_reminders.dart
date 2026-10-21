@@ -136,9 +136,10 @@ Future<List<FeedItem>> loadOpenJobs(DatabaseService db, {required DateTime now})
   final repo = JobsRepository(db);
   try {
     final load = await repo.load();
-    final tracked = {for (final a in await db.listApplications()) a.id};
+    final apps = await db.listApplications();
+    final tracked = {for (final a in apps) a.id};
     final decisions = <Decision>[];
-    final decided = <String>{};
+    final decided = <String>{for (final a in apps) if (a.jobPostId != null) a.jobPostId!};
     for (final r in await db.listDecisions()) {
       decided.add(r['job_post_id']! as String);
       try {
@@ -157,7 +158,7 @@ Future<List<FeedItem>> loadOpenJobs(DatabaseService db, {required DateTime now})
     );
     final open = [
       for (final item in snapshot.items)
-        if (!decided.contains(item.jobPostId) && item.deadline.isAfter(now)) item,
+        if (!isDecidedJob(item, decided) && item.deadline.isAfter(now)) item,
     ];
     final prefs = await JobPreferencesStore.read();
     return [

@@ -159,7 +159,129 @@ async def build_jobs_file(session: AsyncSession, *, now: datetime | None = None)
             selectinload(JobPost.timeline),
         )
     )
-    return {"schema": SCHEMA_VERSION, "generated_at": now.isoformat(), "jobs": [job_json(j) for j in jobs]}
+    return {"schema": SCHEMA_VERSION, "generated_at": now.isoformat(), "jobs": without_twins(list(jobs))}
+
+
+# --- The same notice found twice -------------------------------------------------------
+# Two sources can lead to one notice by different files (the official PDF, a job
+# site's page read when the PDF was out of reach), so it is read twice. Mirrored in
+# the app (feed_builder.dart withoutDuplicates).
+
+_ADVERT_FILLER = re.compile(
+    r"\b(?:advt|advertisement|notification|notice|no|number|ref|reference|dated|dt)\b\.?", re.IGNORECASE
+)
+_ORG_FILLER = {"of", "the", "and", "for", "office", "department", "govt", "government"}
+_IST = timedelta(hours=5, minutes=30)
+
+
+def advert_key(advert: str | None) -> str | None:
+    """"CEN No. 06/2026" and "CEN 6/2026" -> "cen-6-2026"; None when too short to tell."""
+    if not advert:
+        return None
+    parts = re.findall(r"[a-z]+|\d+", _ADVERT_FILLER.sub(" ", advert.lower()))
+    parts = [(p.lstrip("0") or "0") if p.isdigit() else p for p in parts]
+    key = "-".join(parts)
+    return key if len(key.replace("-", "")) >= 3 else None
+
+
+def _org_words(org: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", org.lower())
+
+
+def _initials(words: list[str]) -> set[str]:
+    every = "".join(w[0] for w in words)
+    plain = "".join(w[0] for w in words if w not in _ORG_FILLER)
+    return {a for a in (every, plain) if len(a) > 1}
+
+
+def same_board(a: str, b: str) -> bool:
+    """One board, named two ways: "Railway Recruitment Boards" and "Railway
+    Recruitment Board (RRB)". One name's words (bar an acronym of the other) must all
+    be in the other's, so two districts' collectors stay apart."""
+    words_a, words_b = _org_words(a), _org_words(b)
+
+    def significant(words: list[str], other: list[str]) -> set[str]:
+        acronyms = _initials(other)
+        return {
+            w[:-1] if len(w) > 3 and w.endswith("s") else w
+            for w in words
+            if len(w) > 1 and w not in _ORG_FILLER and w not in acronyms
+        }
+
+    sa, sb = significant(words_a, words_b), significant(words_b, words_a)
+    if not words_a or not words_b:
+        return False
+    return sa <= sb or sb <= sa
+
+
+def _post_names(job: JobPost) -> set[str]:
+    return {" ".join(re.findall(r"[a-z0-9]+", (p.post_name or "").lower())) for p in job.posts}
+
+
+def _same_posts(a: JobPost, b: JobPost) -> bool:
+    pa, pb = _post_names(a), _post_names(b)
+    if not pa or not pb:
+        return True
+    return len(pa & pb) * 2 >= min(len(pa), len(pb))
+
+
+def _twin_key(job: JobPost) -> str | None:
+    adv = advert_key(job.advertisement_no)
+    if adv is None or job.application_deadline is None:
+        return None
+    return f"{adv}|{(job.application_deadline.astimezone(UTC) + _IST).date()}"
+
+
+def _rank(job: JobPost) -> tuple[bool, bool, int, bool]:
+    """The copy to keep: read from the notification itself, with the board's site,
+    the most posts, an application link."""
+    return (
+        (job.source_pdf_path or "").endswith(".pdf"),
+        bool(job.portal_url) and not is_job_site(job.portal_url),
+        len(job.posts),
+        bool(job.apply_url),
+    )
+
+
+def without_twins(jobs: list[JobPost]) -> list[dict[str, Any]]:
+    """jobs.json rows with each notice once: one advert number, one closing day in
+    India, one board, overlapping posts. The copy kept gets what only the other knew
+    and lists its id in ``same_as`` (the app hides both once you apply to either)."""
+    groups: list[list[JobPost]] = []
+    for job in jobs:
+        key = _twin_key(job)
+        group = next(
+            (
+                g
+                for g in groups
+                if key is not None
+                and _twin_key(g[0]) == key
+                and same_board(g[0].organization, job.organization)
+                and _same_posts(g[0], job)
+            ),
+            None,
+        )
+        if group is None:
+            groups.append([job])
+        else:
+            group.append(job)
+    rows = []
+    for group in groups:
+        group.sort(key=_rank, reverse=True)
+        row = job_json(group[0])
+        for twin in group[1:]:
+            other = job_json(twin)
+            for field in ("portal_url", "apply_url", "application_start", "exam_date"):
+                if row[field] is None:
+                    row[field] = other[field]
+            if row["timeline"] is not None and other["timeline"] is not None:
+                for field, value in other["timeline"].items():
+                    if row["timeline"].get(field) in (None, {}, []):
+                        row["timeline"][field] = value
+                row["timeline"]["job_post_id"] = row["id"]
+            row.setdefault("same_as", []).append(other["id"])
+        rows.append(row)
+    return rows
 
 
 def _section_milestone(item: DiscoveredItem) -> ExamMilestone | None:

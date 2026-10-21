@@ -146,6 +146,7 @@ class PublishedJob {
     this.timelineJson,
     this.category = 'other',
     this.employmentType,
+    this.sameAs = const [],
   });
 
   final String id;
@@ -172,6 +173,13 @@ class PublishedJob {
   /// Raw 5-stage timeline, stored as-is when the user marks a post Applied.
   final Map<String, dynamic>? timelineJson;
 
+  /// Other copies of this notice the pipeline merged into this one (their ids):
+  /// applying to or turning down any of them counts for this job too.
+  final List<String> sameAs;
+
+  /// This job and the copies merged into it.
+  Iterable<String> get ids => [id, ...sameAs];
+
   factory PublishedJob.fromJson(Map<String, dynamic> j) => PublishedJob(
         id: j['id'] as String,
         organization: j['organization'] as String? ?? '',
@@ -185,6 +193,7 @@ class PublishedJob {
         timelineJson: j['timeline'] as Map<String, dynamic>?,
         category: j['category'] as String? ?? 'other',
         employmentType: j['employment_type'] as String?,
+        sameAs: [for (final id in (j['same_as'] as List<dynamic>? ?? const [])) '$id'],
         posts: [
           for (final p in (j['posts'] as List<dynamic>? ?? const []))
             PublishedPost.fromJson(p as Map<String, dynamic>),

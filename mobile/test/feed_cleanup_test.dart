@@ -40,6 +40,39 @@ void main() {
       expect(withoutDuplicates([job('d', 'IIT Indore'), job('e', 'IIT Indore')], const {}), hasLength(2),
           reason: 'no advert number: not enough to tell');
     });
+
+    List<PublishedPost> posts(String id, List<String> names) => [
+          for (final (i, n) in names.indexed) PublishedPost(id: '$id-$i', postName: n, allowedDegrees: const []),
+        ];
+
+    test('advert numbers written differently: RRB NTPC once', () {
+      final due = DateTime.utc(2026, 11, 6, 18, 29);
+      final a = job('a', 'Railway Recruitment Boards',
+          adv: 'CEN No. 06/2026', due: due, posts: posts('a', ['Goods Train Manager', 'Senior Clerk cum Typist']));
+      final b = job('b', 'Railway Recruitment Board (RRB)',
+          adv: 'CEN 06/2026', due: due.add(const Duration(seconds: 59)), posts: posts('b', ['Senior Clerk Cum Typist']));
+      expect(withoutDuplicates([a, b], const {}).map((j) => j.id), ['a']);
+      expect(advertKey('Ref: GHB/ADM/1708 /2026'), advertKey('GHB/ADM/1708/2026'));
+    });
+
+    test('two districts sharing one order number stay apart', () {
+      final a = job('a', 'District Collector Hyderabad', adv: '2000/Estt/RDDH/HYD/2026');
+      final b = job('b', 'Office of the District Collector and Magistrate, Wanaparthy District',
+          adv: 'No.2000/Estt/RDDH/HYD/2026');
+      expect(withoutDuplicates([a, b], const {}), hasLength(2));
+      expect(sameBoard('SSC', 'Staff Selection Commission'), isTrue);
+    });
+  });
+
+  test('applying to one copy hides the copy the pipeline merged it into', () {
+    final merged = PublishedJob.fromJson({
+      'id': 'kept',
+      'organization': 'Railway Recruitment Boards',
+      'exam_name': 'RRB NTPC Graduate Recruitment 2026',
+      'same_as': ['other'],
+      'posts': const [],
+    });
+    expect(merged.ids, ['kept', 'other']);
   });
 
   test('a notice with no readable eligibility: shown lower, tagged', () {

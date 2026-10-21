@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/eligibility.dart';
+import '../domain/feed_builder.dart';
 import '../domain/relevance.dart';
 import '../domain/requirements.dart';
 import '../domain/subjects.dart';
@@ -137,19 +138,20 @@ final affinityProvider = Provider<Affinity>((ref) {
 // The job lists
 // -----------------------------------------------------------------------------
 
-/// Open jobs you qualify for that you haven't applied to or turned down.
+/// Open jobs you qualify for that you haven't applied to or turned down (nor a
+/// copy of them: one application covers all of a job's posts).
 List<FeedItem> _undecided(Ref ref, List<FeedItem> items) {
-  final trackedPostIds = {
-    for (final a in ref.watch(trackedAppsProvider).dataOrNull ?? const <TrackedApplication>[]) a.id,
-  };
+  final tracked = ref.watch(trackedAppsProvider).dataOrNull ?? const <TrackedApplication>[];
+  final trackedPostIds = {for (final a in tracked) a.id};
   final decided = {
-    for (final d in ref.watch(decisionsProvider).dataOrNull ?? const <JobDecision>[]) d.jobPostId
+    for (final a in tracked) if (a.jobPostId != null) a.jobPostId!,
+    for (final d in ref.watch(decisionsProvider).dataOrNull ?? const <JobDecision>[]) d.jobPostId,
   };
   final now = ref.watch(nowProvider);
   return [
     for (final item in items)
       if (!trackedPostIds.contains(item.bestPost.postDetailId) &&
-          !decided.contains(item.jobPostId) &&
+          !isDecidedJob(item, decided) &&
           item.deadline.isAfter(now))
         item,
   ];

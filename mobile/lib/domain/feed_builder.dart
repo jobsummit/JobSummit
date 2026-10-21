@@ -45,28 +45,73 @@ FeedItem _feedItem(PublishedJob job, List<FeedPost> posts, MatchKind kind) {
   );
 }
 
-final _nonWord = RegExp('[^a-z0-9]+');
 const _orgFiller = {'of', 'the', 'and', 'for', 'office', 'department', 'govt', 'government'};
+final _advertFiller =
+    RegExp(r'\b(?:advt|advertisement|notification|notice|no|number|ref|reference|dated|dt)\b\.?');
 
-/// The same notice published twice (the job sites name the board differently:
-/// "Haryana Public Service Commission" and "… (HPSC)"): one advertisement number,
-/// one closing day in India, overlapping names. One copy is kept: the one you
-/// applied through, else the one with the most posts.
-List<PublishedJob> withoutDuplicates(List<PublishedJob> jobs, Set<String> appliedPostIds) {
-  String? key(PublishedJob j) {
-    final adv = (j.advertisementNo ?? '').toLowerCase().replaceAll(_nonWord, '');
-    final due = j.applicationDeadline;
-    if (adv.length < 3 || due == null) return null;
-    final ist = due.toUtc().add(const Duration(hours: 5, minutes: 30));
-    return '$adv|${ist.year}-${ist.month}-${ist.day}';
+/// "CEN No. 06/2026" and "CEN 6/2026" -> "cen-6-2026"; null when too short to tell.
+/// Same rules as the pipeline (publish.py advert_key).
+String? advertKey(String? advert) {
+  if (advert == null) return null;
+  String part(String p) => RegExp(r'^\d+$').hasMatch(p) ? (int.tryParse(p)?.toString() ?? p) : p;
+  final parts = [
+    for (final m in RegExp(r'[a-z]+|\d+').allMatches(advert.toLowerCase().replaceAll(_advertFiller, ' ')))
+      part(m[0]!),
+  ];
+  final key = parts.join('-');
+  return key.replaceAll('-', '').length >= 3 ? key : null;
+}
+
+List<String> _orgWords(String org) => [for (final m in RegExp('[a-z0-9]+').allMatches(org.toLowerCase())) m[0]!];
+
+Set<String> _initials(List<String> words) => {
+      for (final a in [
+        words.map((w) => w[0]).join(),
+        words.where((w) => !_orgFiller.contains(w)).map((w) => w[0]).join(),
+      ])
+        if (a.length > 1) a,
+    };
+
+/// One board, named two ways ("Railway Recruitment Boards", "Railway Recruitment
+/// Board (RRB)"): one name's words, bar an acronym of the other, all in the other's,
+/// so two districts' collectors stay apart.
+bool sameBoard(String a, String b) {
+  final wa = _orgWords(a), wb = _orgWords(b);
+  if (wa.isEmpty || wb.isEmpty) return false;
+  Set<String> significant(List<String> words, List<String> other) {
+    final acronyms = _initials(other);
+    return {
+      for (final w in words)
+        if (w.length > 1 && !_orgFiller.contains(w) && !acronyms.contains(w))
+          w.length > 3 && w.endsWith('s') ? w.substring(0, w.length - 1) : w,
+    };
   }
 
-  Set<String> words(String org) =>
-      {for (final w in org.toLowerCase().split(_nonWord)) if (w.length > 1 && !_orgFiller.contains(w)) w};
-  bool sameBoard(PublishedJob a, PublishedJob b) {
-    final wa = words(a.organization), wb = words(b.organization);
-    if (wa.isEmpty || wb.isEmpty) return false;
-    return wa.intersection(wb).length * 2 >= (wa.length < wb.length ? wa.length : wb.length);
+  final sa = significant(wa, wb), sb = significant(wb, wa);
+  return sa.difference(sb).isEmpty || sb.difference(sa).isEmpty;
+}
+
+Set<String> _postNames(PublishedJob j) =>
+    {for (final p in j.posts) _orgWords(p.postName).join(' ')};
+
+bool _samePosts(PublishedJob a, PublishedJob b) {
+  final pa = _postNames(a), pb = _postNames(b);
+  if (pa.isEmpty || pb.isEmpty) return true;
+  final smaller = pa.length < pb.length ? pa.length : pb.length;
+  return pa.intersection(pb).length * 2 >= smaller;
+}
+
+/// The same notice published twice (two job sites, or the official PDF and a job
+/// site's page): one advertisement number, one closing day in India, one board,
+/// overlapping posts. One copy is kept: the one you applied through, else the one
+/// with the most posts. The pipeline merges most of these already (same rules).
+List<PublishedJob> withoutDuplicates(List<PublishedJob> jobs, Set<String> appliedPostIds) {
+  String? key(PublishedJob j) {
+    final adv = advertKey(j.advertisementNo);
+    final due = j.applicationDeadline;
+    if (adv == null || due == null) return null;
+    final ist = due.toUtc().add(const Duration(hours: 5, minutes: 30));
+    return '$adv|${ist.year}-${ist.month}-${ist.day}';
   }
 
   int rank(PublishedJob j) =>
@@ -75,7 +120,9 @@ List<PublishedJob> withoutDuplicates(List<PublishedJob> jobs, Set<String> applie
   final kept = <PublishedJob>[];
   for (final job in jobs) {
     final k = key(job);
-    final twin = k == null ? -1 : kept.indexWhere((o) => key(o) == k && sameBoard(o, job));
+    final twin = k == null
+        ? -1
+        : kept.indexWhere((o) => key(o) == k && sameBoard(o.organization, job.organization) && _samePosts(o, job));
     if (twin < 0) {
       kept.add(job);
     } else if (rank(job) > rank(kept[twin])) {
@@ -84,6 +131,10 @@ List<PublishedJob> withoutDuplicates(List<PublishedJob> jobs, Set<String> applie
   }
   return kept;
 }
+
+/// You applied to or turned down this job, or a copy of it the pipeline merged in.
+bool isDecidedJob(FeedItem item, Set<String> jobIds) =>
+    (item.job?.ids ?? [item.jobPostId]).any(jobIds.contains);
 
 /// [appliedPostIds]: posts already tracked on this phone (never shown again).
 FeedSnapshot buildFeed({

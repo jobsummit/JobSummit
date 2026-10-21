@@ -148,6 +148,8 @@ class _JobCardState extends ConsumerState<JobCard> {
     final post = item.bestPost;
     final pay = item.monthlyPay;
     final jobCategory = JobCategory.fromWire(item.category);
+    // Several posts you fit, one application (RRB NTPC, SSC CGL): the exam is the title.
+    final several = item.posts.length > 1;
 
     return AppCard(
       accent: context.urgencyColors.of(item.urgency),
@@ -158,13 +160,13 @@ class _JobCardState extends ConsumerState<JobCard> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: Text(post.postName, style: text.titleMedium)),
+              Expanded(child: Text(several ? item.examName : post.postName, style: text.titleMedium)),
               const SizedBox(width: 8),
               CountdownPill(due: item.deadline, now: now),
             ],
           ),
           const SizedBox(height: 4),
-          Text('${item.organization} · ${item.examName}',
+          Text(several ? '${item.organization} · ${item.posts.length} posts' : '${item.organization} · ${item.examName}',
               style: text.bodySmall, maxLines: 2, overflow: TextOverflow.ellipsis),
           const SizedBox(height: 10),
           Wrap(
