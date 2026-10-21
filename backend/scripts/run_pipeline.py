@@ -17,6 +17,8 @@ import asyncio
 import json
 import logging
 import sys
+import time
+from collections.abc import Awaitable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -217,6 +219,38 @@ async def watchlist_missing(session, jobs: dict, now: datetime) -> list[str]:
     return sorted(missing)
 
 
+class Budget:
+    """The run's clock. GitHub kills the job at its time limit, and a killed run
+    publishes nothing, so every phase gets a share and stops when it runs out."""
+
+    # Pruning and building the files once the work is done.
+    RESERVE_S = 180.0
+
+    def __init__(self, minutes: float) -> None:
+        self.deadline = time.monotonic() + minutes * 60
+
+    def left(self, cap_s: float | None = None) -> float:
+        """Seconds a phase may take: what's left before the reserve, at most cap_s."""
+        left = self.deadline - time.monotonic() - self.RESERVE_S
+        return max(0.0, left if cap_s is None else min(left, cap_s))
+
+
+async def timeboxed(name: str, work: Awaitable[int], seconds: float, stopped: list[str]) -> int:
+    """work's result, or 0 when it is still running after seconds (it is cancelled;
+    what it saved so far stays saved, the rest is picked up next run)."""
+    if seconds <= 0:
+        if asyncio.iscoroutine(work):
+            work.close()
+        stopped.append(name)
+        return 0
+    try:
+        return await asyncio.wait_for(work, timeout=seconds)
+    except TimeoutError:
+        log.warning("%s: out of time after %.0f s; the rest waits for the next run", name, seconds)
+        stopped.append(name)
+        return 0
+
+
 def write_json(path: Path, data: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
@@ -224,9 +258,13 @@ def write_json(path: Path, data: object) -> None:
     tmp.replace(path)
 
 
-async def run(out: Path, ingest_rounds: int, ingest_minutes: int = 25) -> dict[str, object]:
+async def run(
+    out: Path, ingest_rounds: int, ingest_minutes: int = 25, budget_minutes: float = 36
+) -> dict[str, object]:
     settings = get_settings()
     started = datetime.now(UTC)
+    budget = Budget(budget_minutes)
+    stopped: list[str] = []
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         for ddl in ADDED_COLUMNS:
@@ -246,25 +284,42 @@ async def run(out: Path, ingest_rounds: int, ingest_minutes: int = 25) -> dict[s
     try:
         stats["jobs_reopened"] = await reopen_open_jobs(started)
         stats["notices_reclassified"] = await reclassify_section_notices()
-        stats["sources_crawled"] = await run_due_crawls(SessionLocal, fetcher, settings)
+        # Each page phase is capped: one slow or hanging site must not eat the time
+        # the PDFs (the new jobs) need.
+        stats["sources_crawled"] = await timeboxed(
+            "crawl", run_due_crawls(SessionLocal, fetcher, settings), budget.left(10 * 60), stopped
+        )
         async with SessionLocal() as session:
-            stats["detail_pages"] = await follow_detail_pages(session, fetcher, settings)
+            stats["detail_pages"] = await timeboxed(
+                "detail_pages", follow_detail_pages(session, fetcher, settings), budget.left(8 * 60), stopped
+            )
         async with SessionLocal() as session:
-            stats["notice_links"] = await resolve_notice_links(session, fetcher)
+            stats["notice_links"] = await timeboxed(
+                "notice_links", resolve_notice_links(session, fetcher), budget.left(5 * 60), stopped
+            )
 
         ingested = 0
         stats["gemini_quota_exhausted"] = False
         if gemini_configured():
             stats["pdfs_requeued"] = await requeue_setup_failures()
-            # Read until the queue is empty, every AI is out of quota, or time's up
-            # (the job has a 50-minute limit). Each PDF gets one try per run.
+            # Read until the queue is empty, every AI is out of quota, or time's up.
+            # Each PDF gets one try per run; a round still running at the deadline
+            # (Gemini slow and retrying) is cancelled.
             attempted: set = set()
-            deadline = datetime.now(UTC) + timedelta(minutes=ingest_minutes)
+            ingest_until = time.monotonic() + budget.left(ingest_minutes * 60)
             for _ in range(ingest_rounds):
-                if await pending_pdfs() <= len(attempted) or datetime.now(UTC) > deadline:
+                left = ingest_until - time.monotonic()
+                if await pending_pdfs() <= len(attempted) or left <= 0:
                     break
                 async with SessionLocal() as session:
-                    ingested += await ingest_pending_pdfs(session, fetcher, settings, attempted=attempted)
+                    ingested += await timeboxed(
+                        "pdfs",
+                        ingest_pending_pdfs(session, fetcher, settings, attempted=attempted),
+                        left,
+                        stopped,
+                    )
+                if "pdfs" in stopped:
+                    break
                 if not quota_left():
                     log.warning("Gemini quota used up for today; remaining PDFs wait for the next run")
                     stats["gemini_quota_exhausted"] = True
@@ -276,6 +331,7 @@ async def run(out: Path, ingest_rounds: int, ingest_minutes: int = 25) -> dict[s
             log.warning("GEMINI_API_KEY not set: skipping PDF extraction this run")
         stats["pdfs_ingested"] = ingested
         stats["pdfs_waiting"] = await pending_pdfs()
+        stats["stopped_early"] = stopped
 
         now = datetime.now(UTC)
         await prune(now)
@@ -308,9 +364,12 @@ def main() -> None:
         help="most ingest rounds per run (INGEST_BATCH_SIZE PDFs each)",
     )
     parser.add_argument("--ingest-minutes", type=int, default=25, help="time budget for reading PDFs")
+    parser.add_argument(
+        "--budget-minutes", type=float, default=36, help="whole run, publishing included"
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    stats = asyncio.run(run(args.out, args.ingest_rounds, args.ingest_minutes))
+    stats = asyncio.run(run(args.out, args.ingest_rounds, args.ingest_minutes, args.budget_minutes))
     log.info("Done: %s", stats)
 
 
