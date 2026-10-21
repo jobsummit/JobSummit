@@ -16,7 +16,7 @@ import 'profile_store.dart';
 /// Jobs that fit you and close within this window get last-day reminders.
 const kLastDayWindow = Duration(hours: 24);
 
-/// A reminder notification at most this often per job (the background check runs ~every 4 h).
+/// A reminder notification at most this often per job (the background check runs ~every 15 min).
 const kNagEvery = Duration(hours: 4);
 
 /// The on/off switch (Settings → Alerts). On by default.

@@ -8,6 +8,7 @@ import 'package:exam_tracker/services/page_links.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const ssc = 'Staff Selection Commission';
@@ -184,6 +185,29 @@ void main() {
       await track();
       final findings = await ExamWatchService(db, client: fakeWeb(portalStatus: 403)).run(now: now);
       expect(findings.single.updates.single.milestone, Milestone.answerKey);
+    });
+
+    test('every 15 minutes: notices.json only when changed, board pages every 2 hours', () async {
+      SharedPreferences.setMockInitialValues({});
+      await track();
+      var pageReads = 0, noticeDownloads = 0;
+      final web = MockClient((req) async {
+        if (req.url.path.endsWith('notices.json')) {
+          if (req.headers['If-None-Match'] == '"v1"') return http.Response('', 304);
+          noticeDownloads++;
+          return http.Response(jsonEncode({'schema': 1, 'notices': const []}), 200, headers: {'etag': '"v1"'});
+        }
+        pageReads++;
+        return http.Response(noticeBoard, 200, headers: {'content-type': 'text/html'});
+      });
+      final watcher = ExamWatchService(db, client: web);
+      const gap = Duration(hours: 2);
+      await watcher.run(now: now, pageGap: gap);
+      await watcher.run(now: now.add(const Duration(minutes: 15)), pageGap: gap);
+      await watcher.run(now: now.add(const Duration(minutes: 30)), pageGap: gap);
+      expect((pageReads, noticeDownloads), (1, 1)); // then "not modified", and the page left alone
+      await watcher.run(now: now.add(const Duration(hours: 2, minutes: 1)), pageGap: gap);
+      expect(pageReads, 2);
     });
 
     test('archived and finished exams are not watched', () async {

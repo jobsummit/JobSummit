@@ -204,10 +204,12 @@ class TrackedAppsNotifier extends AsyncNotifier<List<TrackedApplication>> {
   }
 
   /// Runs the exam watcher now (pull-to-refresh, app start). Throttled to once per
-  /// 30 minutes unless [force]d; the background task runs it every ~4 hours.
+  /// 10 minutes unless [force]d (pull-to-refresh: board pages again after 10
+  /// minutes); the background task runs it every ~15 minutes.
   Future<int> checkForUpdates({bool force = false}) async {
     try {
-      final found = await runWatchAndNotify(_db, force: force);
+      final found = await runWatchAndNotify(_db,
+          force: force, pageGap: force ? const Duration(minutes: 10) : kPageGap);
       await reload(); // also notices taken off as not about this round
       final combined = await combineDuplicates();
       if (found > 0 && combined == 0) _changed();

@@ -16,23 +16,28 @@ const _taskName = 'exam-watch';
 const _uniqueName = 'exam-watch-periodic';
 const _lastRunKey = 'watch.lastRun';
 
-/// Android may stretch this (Doze, battery saver); turning off battery
-/// optimisation for the app keeps it close to every 4 hours.
-const kWatchInterval = Duration(hours: 4);
+/// Android's shortest interval; it may stretch it (Doze, battery saver). Each
+/// check is small: notices.json only when it changed, board pages at most every
+/// [kPageGap].
+const kWatchInterval = Duration(minutes: 15);
+
+/// How long a board's page that was just read is left alone.
+const kPageGap = Duration(hours: 2);
 
 /// One watcher pass: find new notices, notify, and move calendar events whose
 /// exam date the watcher just learned or changed. Used by the background task
-/// and by pull-to-refresh. Returns how many new notices were found.
-Future<int> runWatchAndNotify(DatabaseService db, {bool force = false}) async {
+/// and by pull-to-refresh. Returns how many new notices were found. [pageGap]:
+/// see [ExamWatchService.run] (pull-to-refresh passes a shorter one).
+Future<int> runWatchAndNotify(DatabaseService db, {bool force = false, Duration pageGap = kPageGap}) async {
   final prefs = await SharedPreferences.getInstance();
   final now = DateTime.now();
   final last = DateTime.fromMillisecondsSinceEpoch(prefs.getInt(_lastRunKey) ?? 0);
-  if (!force && now.difference(last) < const Duration(minutes: 30)) return 0; // just ran
+  if (!force && now.difference(last) < const Duration(minutes: 10)) return 0; // just ran
   await prefs.setInt(_lastRunKey, now.millisecondsSinceEpoch);
 
   final watcher = ExamWatchService(db);
   try {
-    final findings = await watcher.run(now: now);
+    final findings = await watcher.run(now: now, pageGap: pageGap);
     final calendar = CalendarSyncService(db);
     var count = 0;
     for (final f in findings) {
@@ -84,7 +89,7 @@ void watchCallbackDispatcher() {
   });
 }
 
-/// Registers the 4-hourly background check (idempotent; safe on every start).
+/// Registers the background check, every 15 minutes (idempotent; safe on every start).
 Future<void> scheduleBackgroundWatch() async {
   await Workmanager().initialize(watchCallbackDispatcher);
   await Workmanager().registerPeriodicTask(

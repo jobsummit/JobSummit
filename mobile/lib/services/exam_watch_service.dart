@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/exam_watcher.dart';
 import '../models/links.dart';
@@ -39,8 +40,14 @@ class ExamWatchService {
   static const _watchWindow = Duration(days: 548);
   static const _userAgent = 'Mozilla/5.0 (Linux; Android) JobSummit/0.8 (personal exam tracker)';
 
-  Future<List<WatchFinding>> run({DateTime? now}) async {
+  /// [pageGap]: how long a board page that was just read is left alone (the
+  /// background check runs every 15 minutes; the boards' pages change far less
+  /// often). notices.json is checked every time: unchanged, it costs a "not modified".
+  Future<List<WatchFinding>> run({DateTime? now, Duration pageGap = Duration.zero}) async {
     final at = now ?? DateTime.now();
+    _prefs = await _loadPrefs();
+    _pageGap = pageGap;
+    _at = at;
     final findings = <WatchFinding>[];
     final apps = <TrackedApplication>[];
     for (var a in await _db.listApplications()) {
@@ -86,7 +93,7 @@ class ExamWatchService {
         for (final url in app.catalogExam?.watchUrls ?? const <String>[]) url: false,
       };
       for (final MapEntry(key: url, value: specific) in boardPages.entries) {
-        final links = pages.containsKey(url) ? pages[url] : (pages[url] = await _pageLinks(url));
+        final links = pages.containsKey(url) ? pages[url] : (pages[url] = await _pageLinksIfDue(url));
         if (links == null) continue;
         detected.addAll(detectUpdates(
           links,
@@ -155,11 +162,66 @@ class ExamWatchService {
     return WatchFinding(app, after, detected);
   }
 
+  SharedPreferences? _prefs;
+  Duration _pageGap = Duration.zero;
+  DateTime _at = DateTime.now();
+
+  static const _noticesEtagKey = 'watch.notices.etag'; // "address\netag"
+  static const _noticesBodyKey = 'watch.notices.body';
+  static const _pageReadPrefix = 'watch.page.';
+
+  static Future<SharedPreferences?> _loadPrefs() async {
+    try {
+      return await SharedPreferences.getInstance();
+    } catch (_) {
+      return null; // no storage (tests): read everything every time
+    }
+  }
+
+  /// A board page, unless it was read less than [_pageGap] ago (its links were
+  /// seen then). Kind to the boards' sites: one read per page per gap, shared by
+  /// every exam on that board.
+  Future<List<PageLink>?> _pageLinksIfDue(String url) async {
+    final key = '$_pageReadPrefix$url';
+    final last = _prefs?.getInt(key);
+    if (last != null &&
+        _at.difference(DateTime.fromMillisecondsSinceEpoch(last)) < _pageGap &&
+        _pageGap > Duration.zero) {
+      return null;
+    }
+    await _prefs?.setInt(key, _at.millisecondsSinceEpoch);
+    return _pageLinks(url);
+  }
+
+  /// notices.json, downloaded again only when it changed (ETag).
+  Future<String?> _noticesBody() async {
+    final prefs = _prefs;
+    final saved = prefs?.getString(_noticesEtagKey)?.split('\n');
+    final cached = prefs?.getString(_noticesBodyKey);
+    final got = await DataSource(_client).get('notices.json', headers: (base) => {
+          if (cached != null && saved != null && saved.length == 2 && saved[0] == base) 'If-None-Match': saved[1],
+        });
+    final res = got.response;
+    if (res.statusCode == 304) return cached;
+    if (res.statusCode != 200) return null;
+    final body = utf8.decode(res.bodyBytes);
+    final etag = res.headers['etag'];
+    try {
+      if (etag != null) {
+        await prefs?.setString(_noticesEtagKey, '${got.base}\n$etag');
+        await prefs?.setString(_noticesBodyKey, body);
+      } else {
+        await prefs?.remove(_noticesEtagKey);
+      }
+    } catch (_) {}
+    return body;
+  }
+
   Future<List<PageLink>> _notices() async {
     try {
-      final res = (await DataSource(_client).get('notices.json')).response;
-      if (res.statusCode != 200) return const [];
-      final data = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      final body = await _noticesBody();
+      if (body == null) return const [];
+      final data = jsonDecode(body) as Map<String, dynamic>;
       return [
         for (final n in (data['notices'] as List<dynamic>? ?? const []))
           if (n is Map<String, dynamic> && n['url'] is String)
