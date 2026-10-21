@@ -40,18 +40,30 @@ class ExamWatchService {
 
   Future<List<WatchFinding>> run({DateTime? now}) async {
     final at = now ?? DateTime.now();
-    final apps = [
-      for (final a in await _db.listApplications())
-        if (!a.archived &&
-            a.displayStatus != TrackerStatus.resultDeclared &&
-            a.createdAt.isAfter(at.subtract(_watchWindow)))
-          a,
-    ];
-    if (apps.isEmpty) return const [];
+    final findings = <WatchFinding>[];
+    final apps = <TrackedApplication>[];
+    for (var a in await _db.listApplications()) {
+      if (a.archived || !a.createdAt.isAfter(at.subtract(_watchWindow))) continue;
+      // Notices from another round of the exam come off first (a result found
+      // that way may be all that stopped the watching).
+      final fixed = withoutStrayUpdates(a);
+      if (fixed != null) {
+        await _db.saveWatcherState(
+          a.id,
+          status: fixed.status.wire,
+          updatesJson: jsonEncode([for (final u in fixed.updates) u.toJson()]),
+          timelineJson: jsonEncode(fixed.timeline),
+        );
+        final after = await _db.getApplication(a.id) ?? a;
+        findings.add(WatchFinding(a, after, const []));
+        a = after;
+      }
+      if (a.displayStatus != TrackerStatus.resultDeclared) apps.add(a);
+    }
+    if (apps.isEmpty) return findings;
 
     final notices = await _notices();
     final pages = <String, List<PageLink>?>{}; // one fetch per portal per run
-    final findings = <WatchFinding>[];
     for (var app in apps) {
       // Notices already seen are not detected again: re-read their dates instead.
       if (app.updates.isNotEmpty) {
@@ -64,7 +76,9 @@ class ExamWatchService {
       }
       final known = {for (final u in app.updates) canonicalUrl(u.url)};
       final detected = <DetectedUpdate>[];
-      final portal = app.portalUrl;
+      final round = ExamRound.of(app);
+      // The board's site; a job site's article only when the board's isn't known.
+      final portal = app.officialUrl;
       if (portal != null && portal.isNotEmpty) {
         final links = pages.containsKey(portal) ? pages[portal] : (pages[portal] = await _pageLinks(portal));
         if (links != null) {
@@ -77,6 +91,7 @@ class ExamWatchService {
             knownUrls: known,
             now: at,
             stage: app.tierName,
+            round: round,
           ));
         }
       }
@@ -89,9 +104,16 @@ class ExamWatchService {
         knownUrls: {...known, for (final d in detected) d.url},
         now: at,
         stage: app.tierName,
+        round: round,
       ));
       if (detected.isEmpty) continue;
-      findings.add(await _record(app, detected, at));
+      final i = findings.indexWhere((f) => f.after.id == app.id);
+      final finding = await _record(app, detected, at);
+      if (i >= 0) {
+        findings[i] = WatchFinding(findings[i].before, finding.after, finding.updates);
+      } else {
+        findings.add(finding);
+      }
     }
     return findings;
   }
@@ -109,6 +131,7 @@ class ExamWatchService {
           eventDate: d.eventDate,
           detectedAt: at,
           source: d.source.name,
+          publishedAt: d.publishedAt,
         ),
       ...app.updates,
     ].take(_keepUpdates).toList();
@@ -134,7 +157,12 @@ class ExamWatchService {
       return [
         for (final n in (data['notices'] as List<dynamic>? ?? const []))
           if (n is Map<String, dynamic> && n['url'] is String)
-            PageLink(url: n['url'] as String, title: n['title'] as String? ?? '', link: n['link'] as String?),
+            PageLink(
+              url: n['url'] as String,
+              title: n['title'] as String? ?? '',
+              link: n['link'] as String?,
+              publishedAt: n['published_at'] is String ? DateTime.tryParse(n['published_at'] as String) : null,
+            ),
       ];
     } catch (_) {
       return const []; // offline or the pipeline hasn't run yet: portals still get checked

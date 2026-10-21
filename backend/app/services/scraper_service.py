@@ -499,6 +499,46 @@ _APPLY_LABEL = re.compile(r"\bapply\s+online\b|\bonline\s+(?:application|apply)\
 _REGISTER_LABEL = re.compile(r"\bregistration\b|\bregister\b", re.IGNORECASE)
 _AGGREGATOR_DOMAINS = (*SARKARI_RESULT_DOMAINS, "freejobalert.com")
 
+# Job and news sites write about every exam (same list as the app's links.dart).
+JOB_SITE_DOMAINS = (
+    *_AGGREGATOR_DOMAINS,
+    "sarkariresult.app",
+    "sarkariexam.com",
+    "sarkarinaukri.com",
+    "sarkarinaukriblog.com",
+    "sarkariprep.in",
+    "rojgarresult.com",
+    "recruitmentresult.com",
+    "freshersnow.com",
+    "jagranjosh.com",
+    "testbook.com",
+    "adda247.com",
+    "bankersadda.com",
+    "sscadda.com",
+    "careerpower.in",
+    "oliveboard.in",
+    "ixambee.com",
+    "prepp.in",
+    "indgovtjobs.in",
+    "employmentnews.gov.in",
+    "naukri.com",
+    "shiksha.com",
+    "careers360.com",
+    "collegedunia.com",
+    "timesofindia.indiatimes.com",
+    "indianexpress.com",
+    "hindustantimes.com",
+    "ndtv.com",
+    "news18.com",
+    "jagran.com",
+)
+
+
+def is_job_site(url: str | None) -> bool:
+    """A job site's page, not the exam board's own."""
+    host = (urlsplit((url or "").strip()).hostname or "").lower()
+    return bool(host) and any(host == d or host.endswith(f".{d}") for d in JOB_SITE_DOMAINS)
+
 
 def find_apply_link(html: bytes | str, base_url: str) -> str | None:
     """The official application page a job site links to: SarkariResult's "Apply Online

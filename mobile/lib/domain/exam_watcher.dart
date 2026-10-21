@@ -7,6 +7,7 @@ library;
 
 import 'package:flutter/foundation.dart';
 
+import '../models/links.dart';
 import '../models/tracked_application.dart';
 import 'exam_catalog.dart';
 
@@ -317,6 +318,11 @@ bool namesThisExam(String text, String examName, String? organization) {
   final examYears = _years(examName);
   final textYears = _years(text);
   if (examYears.isNotEmpty && textYears.isNotEmpty && examYears.intersection(textYears).isEmpty) return false;
+  return _namesExam(text, examName, organization);
+}
+
+/// The notice names this exam (any year).
+bool _namesExam(String text, String examName, String? organization) {
   if (alertMatchesExam(text, examName, organization)) return true;
   // "SSC Combined Graduate Level Tier 1 Admit Card" is "SSC CGL": the exam list knows
   // both names (and needs the board named too, so look-alikes don't match).
@@ -346,9 +352,83 @@ bool namesAnotherStage(String text, String? trackedStage) {
   return mine != null && theirs != null && mine != theirs;
 }
 
+// --- Which round of the exam -----------------------------------------------------
+
+/// "CEN 05/2024", "Advt No. 7/2026": the year of the recruitment a notice is about
+/// (not a date: those have three parts).
+final _cycleYearRe = RegExp(r'(?<![\d./-])\d{1,3}\s*/\s*((?:19|20)\d{2})\b');
+
+Set<String> _cycleYears(String text) => {for (final m in _cycleYearRe.allMatches(text)) m.group(1)!};
+
+/// Milestones that only come after the form closes.
+const _afterForm = {Milestone.admitCard, Milestone.answerKey, Milestone.result};
+
+/// What tells this round of an exam from earlier and later ones: its year and when
+/// its form was open. A notice from another round (last year's result, a job site's
+/// list of other exams) never moves the exam along.
+@immutable
+class ExamRound {
+  const ExamRound({this.years = const {}, this.formOpens, this.formCloses, this.knownDates = const []});
+
+  /// From the exam's name ("SSC CGL 2026"), else the year its form opened.
+  factory ExamRound.of(TrackedApplication app) {
+    final raw = app.timelineRaw ?? const <String, dynamic>{};
+    DateTime? at(String key) => raw[key] is String ? DateTime.tryParse(raw[key] as String) : null;
+    final opens = at('application_start');
+    final closes = at('application_end') ?? (app.jobPostId != null ? app.deadline : null);
+    final named = _years(app.examName);
+    return ExamRound(
+      years: named.isNotEmpty ? named : {if (opens != null) '${opens.year}'},
+      formOpens: opens,
+      formCloses: closes,
+      knownDates: [
+        for (final d in [app.timeline?.examStart, app.timeline?.examEnd, app.examAt]) if (d != null) d,
+      ],
+    );
+  }
+
+  /// The round's year(s). Empty: the exam's name gives none (no year check).
+  final Set<String> years;
+  final DateTime? formOpens;
+  final DateTime? formCloses;
+
+  /// Its exam dates, once known: their years count too.
+  final List<DateTime> knownDates;
+
+  /// Years a notice of this round may name: its own, the next one (a 2026
+  /// recruitment's exam and result are often in 2027) and those of its dates.
+  Set<String> get _allowed => {
+        ...years,
+        for (final y in years) '${int.parse(y) + 1}',
+        for (final d in [formOpens, formCloses, ...knownDates]) if (d != null) '${d.year}',
+      };
+
+  /// [text] can be about this round: no other year or recruitment named, nothing
+  /// after the form announced while the form was still open, no date from long
+  /// before it opened. [at]: when it was posted, else when it was first seen.
+  bool admits(String text, Milestone? milestone, DateTime at) {
+    if (years.isNotEmpty) {
+      final cycle = _cycleYears(text);
+      if (cycle.isNotEmpty && cycle.intersection(years).isEmpty) return false; // "CEN 05/2024"
+      final named = _years(text);
+      if (named.isNotEmpty && named.intersection(_allowed).isEmpty) return false; // "Result 2025"
+    }
+    final closes = formCloses;
+    if (closes != null && _afterForm.contains(milestone) && at.isBefore(closes)) return false;
+    final opens = formOpens;
+    if (opens != null) {
+      final w = extractEventWindow(text, reference: at);
+      if (w != null && (w.end ?? w.start).isBefore(opens.subtract(const Duration(days: 120)))) return false;
+    }
+    return true;
+  }
+}
+
 /// A recruitment's own page (".../cen-03-2026/") rather than a whole notice board:
-/// notices there may just say "Download Admit Card".
+/// notices there may just say "Download Admit Card". Never a job site's article:
+/// its sidebars list other exams' admit cards and results.
 bool isExamSpecificPage(String url) {
+  if (isJobSite(url)) return false;
   final path = (Uri.tryParse(url)?.path ?? '').replaceAll(RegExp(r'^/+|/+$'), '');
   final segments = path.split('/').where((s) => s.isNotEmpty).toList();
   return segments.length >= 2 || RegExp(r'\d').hasMatch(path);
@@ -359,7 +439,7 @@ bool isExamSpecificPage(String url) {
 /// A link on a page (or in notices.json) with the text around it.
 @immutable
 class PageLink {
-  const PageLink({required this.url, required this.title, this.context = '', this.link});
+  const PageLink({required this.url, required this.title, this.context = '', this.link, this.publishedAt});
 
   final String url;
   final String title;
@@ -367,6 +447,9 @@ class PageLink {
 
   /// notices.json: the official link the pipeline found on the notice's page.
   final String? link;
+
+  /// notices.json: when the job site posted it.
+  final DateTime? publishedAt;
 }
 
 final _tracking = RegExp(r'^(utm_|fbclid|gclid|ref$|amp$)');
@@ -398,6 +481,7 @@ class DetectedUpdate {
     this.eventDate,
     this.eventEnd,
     this.link,
+    this.publishedAt,
   });
 
   final Milestone milestone;
@@ -405,6 +489,7 @@ class DetectedUpdate {
   final String url;
   final UpdateSource source;
   final DateTime? eventDate;
+  final DateTime? publishedAt;
 
   /// The official link for it (admit card download, answer key, result), if known.
   final String? link;
@@ -415,7 +500,8 @@ class DetectedUpdate {
   final DateTime? eventEnd;
 }
 
-/// New milestone notices for one exam among a page's links.
+/// New milestone notices for one exam among a page's links. [round] (default: the
+/// year in [examName]) keeps out notices of other years and recruitments.
 List<DetectedUpdate> detectUpdates(
   Iterable<PageLink> links, {
   required String examName,
@@ -425,20 +511,22 @@ List<DetectedUpdate> detectUpdates(
   required Set<String> knownUrls,
   DateTime? now,
   String? stage,
+  ExamRound? round,
 }) {
   final found = <DetectedUpdate>[];
   final seen = {...knownUrls};
-  final examYears = _years(examName);
+  final at = now ?? DateTime.now();
+  final thisRound = round ?? ExamRound(years: _years(examName));
   for (final link in links) {
     final url = canonicalUrl(link.url);
     if (seen.contains(url)) continue;
     final text = '${link.title} ${link.context}'.trim();
     final milestone = classifyMilestone(text);
     if (milestone == null) continue;
-    final textYears = _years(text);
-    if (examYears.isNotEmpty && textYears.isNotEmpty && examYears.intersection(textYears).isEmpty) continue;
+    if (!thisRound.admits(text, milestone, link.publishedAt ?? at)) continue;
     if (namesAnotherStage(text, stage)) continue; // a Tier 1 notice for an exam tracked at Tier-2
-    if (!examSpecificPage && !namesThisExam(text, examName, organization)) continue;
+    // A job site's page is always about many exams: it has to name this one.
+    if ((!examSpecificPage || isJobSite(url)) && !_namesExam(text, examName, organization)) continue;
     seen.add(url);
     final title = link.title.isEmpty ? text : link.title;
     final window = extractEventWindow(text, reference: now);
@@ -450,9 +538,73 @@ List<DetectedUpdate> detectUpdates(
       eventDate: window?.start,
       eventEnd: window?.end,
       link: link.link,
+      publishedAt: link.publishedAt,
     ));
   }
   return found;
+}
+
+/// Not about this exam's round after all: found by an older, looser watcher, or
+/// brought back by a backup from such a phone.
+bool isStrayUpdate(TrackedApplication app, ExamUpdate u, {ExamRound? round}) {
+  final milestone = Milestone.fromWire(u.milestone);
+  if (milestone == null) return false;
+  if (isJobSite(u.url) && !_namesExam(u.title, app.examName, app.organization)) return true;
+  if (namesAnotherStage(u.title, app.tierName)) return true;
+  final seen = u.detectedAt ?? app.createdAt;
+  return !(round ?? ExamRound.of(app)).admits(u.title, milestone, u.publishedAt ?? seen);
+}
+
+DetectedUpdate _replay(ExamUpdate u, Milestone m, DateTime seen) {
+  final w = extractEventWindow(u.title, reference: seen);
+  return DetectedUpdate(
+    milestone: m,
+    title: u.title,
+    url: u.url,
+    source: u.source == UpdateSource.official.name ? UpdateSource.official : UpdateSource.aggregator,
+    eventDate: w?.start,
+    eventEnd: w?.end,
+    link: u.link,
+    publishedAt: u.publishedAt,
+  );
+}
+
+/// [app]'s watcher findings without its stray notices ([isStrayUpdate]): the
+/// status from what is left, and the timeline without what only the strays set.
+/// Null when every notice is about this round.
+({List<ExamUpdate> updates, TrackerStatus status, Map<String, dynamic> timeline})? withoutStrayUpdates(
+    TrackedApplication app) {
+  final round = ExamRound.of(app);
+  final kept = <ExamUpdate>[], stray = <ExamUpdate>[];
+  for (final u in app.updates) {
+    (isStrayUpdate(app, u, round: round) ? stray : kept).add(u);
+  }
+  if (stray.isEmpty) return null;
+  var t = <String, dynamic>{...?app.timelineRaw};
+  t['job_post_id'] ??= app.jobPostId ?? app.id;
+  for (final u in stray) {
+    final m = Milestone.fromWire(u.milestone)!;
+    final seen = u.detectedAt?.toLocal() ?? app.createdAt;
+    final setByIt = fillTimeline(<String, dynamic>{}, _replay(u, m, seen), seen);
+    setByIt.forEach((key, value) {
+      if (t[key] == value) t.remove(key);
+    });
+  }
+  // What the kept notices say goes back in, oldest first.
+  for (final u in kept.reversed) {
+    final m = Milestone.fromWire(u.milestone);
+    if (m == null) continue;
+    final seen = u.detectedAt?.toLocal() ?? app.createdAt;
+    t = fillTimeline(t, _replay(u, m, seen), seen);
+  }
+  return (
+    updates: kept,
+    status: advanceStatus(TrackerStatus.applied, [
+      for (final u in kept)
+        if (Milestone.fromWire(u.milestone) case final m?) m,
+    ]),
+    timeline: t,
+  );
 }
 
 const _statusFor = {

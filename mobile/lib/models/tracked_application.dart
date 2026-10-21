@@ -52,6 +52,7 @@ class ExamUpdate {
     this.detectedAt,
     this.source,
     this.link,
+    this.publishedAt,
   });
 
   final String milestone; // admit_card | exam_schedule | postponed | answer_key | result
@@ -70,6 +71,9 @@ class ExamUpdate {
   final DateTime? detectedAt;
   final String? source; // official | aggregator
 
+  /// When the job site posted it (notices.json), if known.
+  final DateTime? publishedAt;
+
   static DateTime? _day(Object? v) {
     final d = v is String ? DateTime.tryParse(v) : null;
     return d == null ? null : DateTime(d.year, d.month, d.day);
@@ -86,6 +90,7 @@ class ExamUpdate {
         detectedAt: j['detected_at'] is String ? DateTime.tryParse(j['detected_at'] as String) : null,
         source: j['source'] as String?,
         link: j['link'] as String?,
+        publishedAt: j['published_at'] is String ? DateTime.tryParse(j['published_at'] as String) : null,
       );
 
   Map<String, Object?> toJson() => {
@@ -96,6 +101,7 @@ class ExamUpdate {
         'detected_at': detectedAt?.toUtc().toIso8601String(),
         'source': source,
         if (link != null) 'link': link,
+        if (publishedAt != null) 'published_at': publishedAt!.toUtc().toIso8601String(),
       };
 }
 
@@ -189,8 +195,11 @@ class TrackedApplication {
 
   String? get nextTierName => tier + 1 < effectiveTiers.length ? effectiveTiers[tier + 1] : null;
 
-  /// The board's website and notice board.
-  String? get officialUrl => preferredUrl(portalUrl, catalogExam?.officialUrl);
+  /// The board's website and notice board. A job site's article (where the job
+  /// was found) only when the exam list doesn't know the board's site.
+  String? get officialUrl => isJobSite(portalUrl)
+      ? preferredUrl(catalogExam?.officialUrl, portalUrl)
+      : preferredUrl(portalUrl, catalogExam?.officialUrl);
 
   /// Candidate login: the application page, else the board's login, else its website.
   String? get loginUrl => preferredUrl(applyUrl, catalogExam?.loginUrl) ?? officialUrl;

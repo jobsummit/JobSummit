@@ -25,7 +25,7 @@ from app.domain.qualifications import QualificationLevel
 from app.models import DiscoveredItem, JobPost, PostDetail
 from app.services.exam_watcher import classify_milestone
 from app.services.lifecycle import timeline_out
-from app.services.scraper_service import SECTION_FLAG
+from app.services.scraper_service import SECTION_FLAG, is_job_site
 from app.services.streams import infer_requirement
 
 SCHEMA_VERSION = 1
@@ -133,7 +133,9 @@ def job_json(job: JobPost) -> dict[str, Any]:
         "organization": job.organization,
         "exam_name": job.exam_name,
         "advertisement_no": job.advertisement_no,
-        "portal_url": job.portal_url,
+        # The board's site. A job site's address is what the AI copies when it read the
+        # job site's page (the official PDF unreachable): the app would watch the wrong page.
+        "portal_url": None if is_job_site(job.portal_url) else job.portal_url,
         "apply_url": job.apply_url,  # the registration page itself, when a job site links it
         "category": job_category(job.organization, job.exam_name),
         "employment_type": job.employment_type,

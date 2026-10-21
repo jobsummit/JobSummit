@@ -83,3 +83,19 @@ def test_jobs_get_a_category_for_filtering():
     assert job_category("IIT Kharagpur", "Junior Research Fellow [JRF]") == "research"
     assert job_category("Bharat Electronics Limited", "Probationary Engineer") == "psu"
     assert job_category("Tata Memorial Centre", "Gardener") == "other"
+
+
+def test_a_job_sites_address_is_not_the_boards_site():
+    job = JobPost(
+        id=uuid.uuid4(),
+        organization="Railway Recruitment Boards",
+        exam_name="RRB NTPC Graduate Recruitment 2026",
+        needs_review=True,
+        portal_url="https://www.freejobalert.com/articles/rrb-ntpc-graduate-recruitment-062026-3068511",
+        apply_url="https://www.rrbapply.gov.in/",
+    )
+    job.timeline = None
+    job.posts = []
+    data = job_json(job)
+    assert data["portal_url"] is None
+    assert data["apply_url"] == "https://www.rrbapply.gov.in/"

@@ -8,6 +8,7 @@ import 'dart:convert';
 
 import '../models/backup_snapshot.dart';
 import '../models/tracked_application.dart';
+import 'exam_watcher.dart';
 
 const kBackupMaxUpdates = 30;
 const kTombstoneTtl = Duration(days: 180);
@@ -47,7 +48,7 @@ BackupSnapshot mergeSnapshots(BackupSnapshot local, BackupSnapshot remote, {requ
     final row = a == null ? b! : (b == null ? a : _mergeApplication(a, b));
     final removedAt = tombstones[id];
     if (removedAt != null && _ms(row['updated_at']) <= removedAt.millisecondsSinceEpoch) continue;
-    applications[id] = row;
+    applications[id] = _withoutStrays(row);
   }
 
   // Vault + passwords: per application, the side whose vault entry changed last.
@@ -108,6 +109,23 @@ Map<String, Object?> _mergeApplication(Map<String, Object?> a, Map<String, Objec
     'timeline_json': _mergeTimeline(newer['timeline_json'], older['timeline_json']),
     'calendar_synced': (_ms(a['calendar_synced']) == 1 || _ms(b['calendar_synced']) == 1) ? 1 : 0,
   };
+}
+
+/// Notices from another round of the exam stay out, whichever copy still had them
+/// (a phone with an older watcher, or a backup saved before they were taken off).
+Map<String, Object?> _withoutStrays(Map<String, Object?> row) {
+  try {
+    final fixed = withoutStrayUpdates(TrackedApplication.fromRow(row));
+    if (fixed == null) return row;
+    return {
+      ...row,
+      'updates_json': jsonEncode([for (final u in fixed.updates) u.toJson()]),
+      'server_status': fixed.status.wire,
+      'timeline_json': jsonEncode(fixed.timeline),
+    };
+  } catch (_) {
+    return row; // not a complete row: merged as it is
+  }
 }
 
 List<Map<String, dynamic>> _decodeList(Object? raw) {

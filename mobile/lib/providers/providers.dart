@@ -200,10 +200,8 @@ class TrackedAppsNotifier extends AsyncNotifier<List<TrackedApplication>> {
   Future<int> checkForUpdates({bool force = false}) async {
     try {
       final found = await runWatchAndNotify(_db, force: force);
-      if (found > 0) {
-        await reload();
-        _changed();
-      }
+      await reload(); // also notices taken off as not about this round
+      if (found > 0) _changed();
       return found;
     } catch (_) {
       return 0; // offline: the next run catches up
