@@ -1,9 +1,12 @@
 
 
+import '../domain/exam_watcher.dart';
 import '../domain/feed_builder.dart';
 import '../domain/next_step.dart';
+import '../domain/tracked_duplicates.dart';
 import '../domain/xp.dart';
 import '../models/feed.dart';
+import '../models/jobs_data.dart';
 import '../models/tracked_application.dart';
 import '../models/vault_entry.dart';
 import '../services/background_watch.dart';
@@ -206,10 +209,88 @@ class TrackedAppsNotifier extends AsyncNotifier<List<TrackedApplication>> {
     try {
       final found = await runWatchAndNotify(_db, force: force);
       await reload(); // also notices taken off as not about this round
-      if (found > 0) _changed();
+      final combined = await combineDuplicates();
+      if (found > 0 && combined == 0) _changed();
       return found;
     } catch (_) {
       return 0; // offline: the next run catches up
+    }
+  }
+
+  /// One application tracked twice (the same notice from two job sites, each copy
+  /// marked applied; two posts of one job) becomes one entry: the one with your
+  /// IDs, else the copy the Jobs list shows, else the first. It gets what only the
+  /// other had (IDs, password, exam date, notices); the other is removed, here and
+  /// in the backup. Returns how many were removed.
+  Future<int> combineDuplicates() async {
+    final apps = state.dataOrNull ?? await _db.listApplications();
+    if (apps.length < 2) return 0;
+    final withIds = <String>{};
+    for (final a in apps) {
+      final vault = await _db.getVault(a.id);
+      if ((vault != null && !vault.isEmpty) || await _secrets.readPassword(a.id) != null) withIds.add(a.id);
+    }
+    final jobs = ref.read(jobsLoadProvider).dataOrNull?.file.jobs ?? const <PublishedJob>[];
+    var removed = 0;
+    for (final [keep, ...others] in duplicateGroups(apps, jobs: jobs, withIds: withIds)) {
+      for (final other in others) {
+        await _absorb(keep.id, other);
+        await untrack(other.id);
+        removed++;
+      }
+    }
+    return removed;
+  }
+
+  /// Copies onto [keepId] what only [other] has.
+  Future<void> _absorb(String keepId, TrackedApplication other) async {
+    final keep = await _db.getApplication(keepId);
+    if (keep == null) return;
+    final vault = await _db.getVault(keepId);
+    final otherVault = await _db.getVault(other.id);
+    if ((vault == null || vault.isEmpty) && otherVault != null && !otherVault.isEmpty) {
+      await _db.upsertVault(VaultEntry(
+          appId: keepId,
+          registrationId: otherVault.registrationId,
+          rollNumber: otherVault.rollNumber,
+          notes: otherVault.notes));
+    }
+    final otherPassword = await _secrets.readPassword(other.id);
+    if (otherPassword != null && await _secrets.readPassword(keepId) == null) {
+      await _secrets.writePassword(keepId, otherPassword);
+    }
+    final status = other.status.index > keep.status.index ? other.status : keep.status;
+    await _db.updateStatus(keepId, status,
+        examAt: keep.examAt ?? other.examAt, admitCardUrl: keep.admitCardUrl ?? other.admitCardUrl);
+    // Notices from both (strays from another round taken off again).
+    final urls = {for (final u in keep.updates) u.url};
+    final updates = [...keep.updates, for (final u in other.updates) if (!urls.contains(u.url)) u]
+      ..sort((a, b) => (b.detectedAt ?? DateTime(0)).compareTo(a.detectedAt ?? DateTime(0)));
+    final timeline = <String, dynamic>{
+      ...?other.timelineRaw,
+      for (final e in (keep.timelineRaw ?? const <String, dynamic>{}).entries)
+        if (e.value != null) e.key: e.value,
+    };
+    if (timeline.isNotEmpty) timeline['job_post_id'] = keep.jobPostId ?? keep.id;
+    final merged = [for (final u in updates.take(30)) u];
+    await _db.saveWatcherState(
+      keepId,
+      status: advanceStatus(TrackerStatus.applied, [
+        for (final u in merged)
+          if (Milestone.fromWire(u.milestone) case final m?) m,
+      ]).wire,
+      updatesJson: jsonEncode([for (final u in merged) u.toJson()]),
+      timelineJson: timeline.isEmpty ? null : jsonEncode(timeline),
+    );
+    final saved = await _db.getApplication(keepId);
+    final fixed = saved == null ? null : withoutStrayUpdates(saved);
+    if (fixed != null) {
+      await _db.saveWatcherState(
+        keepId,
+        status: fixed.status.wire,
+        updatesJson: jsonEncode([for (final u in fixed.updates) u.toJson()]),
+        timelineJson: jsonEncode(fixed.timeline),
+      );
     }
   }
 
