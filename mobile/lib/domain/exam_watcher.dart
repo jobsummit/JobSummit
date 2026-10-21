@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 import '../models/links.dart';
 import '../models/tracked_application.dart';
 import 'exam_catalog.dart';
+import 'feed_builder.dart' show advertKey;
 
 /// Backend `ExamMilestone` wire values.
 enum Milestone {
@@ -322,12 +323,17 @@ bool namesThisExam(String text, String examName, String? organization) {
 }
 
 /// The notice names this exam (any year).
-bool _namesExam(String text, String examName, String? organization) {
+/// On the board's own page ([boardsPage]) the board goes without saying: IBPS's
+/// "Result of CRP-SPL-XVI" is IBPS SO, SBI's "Recruitment of Junior Associates" is
+/// SBI Clerk.
+bool _namesExam(String text, String examName, String? organization, {bool boardsPage = false}) {
   if (alertMatchesExam(text, examName, organization)) return true;
   // "SSC Combined Graduate Level Tier 1 Admit Card" is "SSC CGL": the exam list knows
   // both names (and needs the board named too, so look-alikes don't match).
   final mine = matchCatalogExam('$examName ${organization ?? ''}');
-  return mine != null && matchCatalogExam(text)?.id == mine.id;
+  if (mine == null) return false;
+  final board = boardsPage ? ' ${mine.name.split(' ').first} ${mine.board}' : '';
+  return matchCatalogExam('$text$board')?.id == mine.id;
 }
 
 const _romanStage = {'i': '1', 'ii': '2', 'iii': '3', 'iv': '4', 'v': '5'};
@@ -360,6 +366,10 @@ final _cycleYearRe = RegExp(r'(?<![\d./-])\d{1,3}\s*/\s*((?:19|20)\d{2})\b');
 
 Set<String> _cycleYears(String text) => {for (final m in _cycleYearRe.allMatches(text)) m.group(1)!};
 
+/// "Advertisement No: ...", "Advt. No. ...", "CEN 06/2025".
+final _namesAnAdvert =
+    RegExp(r'\b(?:advertisement|advt)\.?\s*(?:no|number)\b|\bcen\s*(?:no\.?\s*)?\d', caseSensitive: false);
+
 /// Milestones that only come after the form closes.
 const _afterForm = {Milestone.admitCard, Milestone.answerKey, Milestone.result};
 
@@ -368,7 +378,8 @@ const _afterForm = {Milestone.admitCard, Milestone.answerKey, Milestone.result};
 /// list of other exams) never moves the exam along.
 @immutable
 class ExamRound {
-  const ExamRound({this.years = const {}, this.formOpens, this.formCloses, this.knownDates = const []});
+  const ExamRound(
+      {this.years = const {}, this.formOpens, this.formCloses, this.knownDates = const [], this.advert});
 
   /// From the exam's name ("SSC CGL 2026"), else the year its form opened.
   factory ExamRound.of(TrackedApplication app) {
@@ -384,6 +395,7 @@ class ExamRound {
       knownDates: [
         for (final d in [app.timeline?.examStart, app.timeline?.examEnd, app.examAt]) if (d != null) d,
       ],
+      advert: advertKey(raw['advertisement_no'] as String?),
     );
   }
 
@@ -394,6 +406,11 @@ class ExamRound {
 
   /// Its exam dates, once known: their years count too.
   final List<DateTime> knownDates;
+
+  /// Its advertisement number ([advertKey] form), saved when you applied from the
+  /// Jobs list: a notice naming another one ("CEN 06/2025", SBI's other "Specialist
+  /// Cadre Officers" adverts) is another recruitment.
+  final String? advert;
 
   /// Years a notice of this round may name: its own, the next one (a 2026
   /// recruitment's exam and result are often in 2027) and those of its dates.
@@ -407,6 +424,10 @@ class ExamRound {
   /// after the form announced while the form was still open, no date from long
   /// before it opened. [at]: when it was posted, else when it was first seen.
   bool admits(String text, Milestone? milestone, DateTime at) {
+    final advert = this.advert;
+    if (advert != null && !'-${advertKey(text) ?? ''}-'.contains('-$advert-') && _namesAnAdvert.hasMatch(text)) {
+      return false;
+    }
     if (years.isNotEmpty) {
       final cycle = _cycleYears(text);
       if (cycle.isNotEmpty && cycle.intersection(years).isEmpty) return false; // "CEN 05/2024"
@@ -429,9 +450,8 @@ class ExamRound {
 /// its sidebars list other exams' admit cards and results.
 bool isExamSpecificPage(String url) {
   if (isJobSite(url)) return false;
-  final path = (Uri.tryParse(url)?.path ?? '').replaceAll(RegExp(r'^/+|/+$'), '');
-  final segments = path.split('/').where((s) => s.isNotEmpty).toList();
-  return segments.length >= 2 || RegExp(r'\d').hasMatch(path);
+  // A number in the path ("cen-03-2026"): a section like /web/careers is a board.
+  return RegExp(r'\d').hasMatch(Uri.tryParse(url)?.path ?? '');
 }
 
 // --- Links ---------------------------------------------------------------------------
@@ -439,11 +459,16 @@ bool isExamSpecificPage(String url) {
 /// A link on a page (or in notices.json) with the text around it.
 @immutable
 class PageLink {
-  const PageLink({required this.url, required this.title, this.context = '', this.link, this.publishedAt});
+  const PageLink(
+      {required this.url, required this.title, this.context = '', this.heading = '', this.link, this.publishedAt});
 
   final String url;
   final String title;
   final String context;
+
+  /// The title of the section the link is in (SBI's "Recruitment of Junior
+  /// Associates ... Advertisement No: ..."): says which exam, not what's out.
+  final String heading;
 
   /// notices.json: the official link the pipeline found on the notice's page.
   final String? link;
@@ -512,6 +537,7 @@ List<DetectedUpdate> detectUpdates(
   DateTime? now,
   String? stage,
   ExamRound? round,
+  bool boardsOwnPage = false,
 }) {
   final found = <DetectedUpdate>[];
   final seen = {...knownUrls};
@@ -523,10 +549,16 @@ List<DetectedUpdate> detectUpdates(
     final text = '${link.title} ${link.context}'.trim();
     final milestone = classifyMilestone(text);
     if (milestone == null) continue;
-    if (!thisRound.admits(text, milestone, link.publishedAt ?? at)) continue;
+    // What's out comes from the link and its row; which exam, also from its section.
+    final about = '$text ${link.heading}'.trim();
+    if (!thisRound.admits(about, milestone, link.publishedAt ?? at)) continue;
     if (namesAnotherStage(text, stage)) continue; // a Tier 1 notice for an exam tracked at Tier-2
     // A job site's page is always about many exams: it has to name this one.
-    if ((!examSpecificPage || isJobSite(url)) && !_namesExam(text, examName, organization)) continue;
+    final jobSite = isJobSite(url);
+    if ((!examSpecificPage || jobSite) &&
+        !_namesExam(about, examName, organization, boardsPage: boardsOwnPage && !jobSite)) {
+      continue;
+    }
     seen.add(url);
     final title = link.title.isEmpty ? text : link.title;
     final window = extractEventWindow(text, reference: now);

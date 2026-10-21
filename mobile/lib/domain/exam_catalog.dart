@@ -12,6 +12,7 @@ class CatalogExam {
     this.loginUrl,
     required this.stages,
     this.aliases = const [],
+    this.watchUrls = const [],
   });
 
   final String id;
@@ -30,6 +31,10 @@ class CatalogExam {
   /// Other names job sites use ("Combined Graduate Level"), for matching.
   final List<String> aliases;
 
+  /// Where the board posts call letters and results when its home page doesn't
+  /// (IBPS's CRP updates, SBI's current openings): read by the exam watcher too.
+  final List<String> watchUrls;
+
   String get link => loginUrl ?? officialUrl;
 }
 
@@ -41,13 +46,20 @@ const _upsc = 'Union Public Service Commission';
 const _upscWeb = 'https://www.upsc.gov.in';
 const _ibps = 'Institute of Banking Personnel Selection';
 const _ibpsWeb = 'https://www.ibps.in';
+const _ibpsWatch = ['https://www.ibps.in/index.php/crp-updates/'];
 const _sbi = 'State Bank of India';
-const _sbiWeb = 'https://sbi.co.in/web/careers';
+const _sbiWeb = 'https://sbi.bank.in/web/careers';
+const _sbiWatch = ['https://sbi.bank.in/web/careers/current-openings'];
 const _rrb = 'Railway Recruitment Boards';
 const _rrbWeb = 'https://www.rrbcdg.gov.in';
 const _rrbLogin = 'https://www.rrbapply.gov.in/#/auth/landing';
 const _rbi = 'Reserve Bank of India';
 const _rbiWeb = 'https://opportunities.rbi.org.in';
+const _rbiWatch = [
+  'https://opportunities.rbi.org.in/Scripts/CallLetters.aspx',
+  'https://opportunities.rbi.org.in/Scripts/resultsnew.aspx',
+];
+const _nabardWatch = ['https://www.nabard.org/careers-notices1.aspx?cid=693&id=26'];
 
 const _pcs = ['Prelims', 'Mains', 'Interview'];
 
@@ -112,41 +124,55 @@ const List<CatalogExam> examCatalog = [
       aliases: ['indian economic service', 'indian statistical service']),
 
   // ---- Banking & insurance
+  // IBPS's own pages name the round's code, not the exam: "CRP-PO/MTs-XVI",
+  // "CRP-SPL-XVI", "CRP CSA-XVI", "CRP RRBs-XV".
   CatalogExam('ibps-po', 'IBPS PO', _ibps,
-      officialUrl: _ibpsWeb, stages: _pcs, aliases: ['probationary officer', 'crp po', 'po/mt']),
+      officialUrl: _ibpsWeb, watchUrls: _ibpsWatch, stages: _pcs,
+      aliases: ['probationary officer', 'crp po', 'po/mt', 'crp po/mt', 'crp po/mts']),
   CatalogExam('ibps-clerk', 'IBPS Clerk', _ibps,
-      officialUrl: _ibpsWeb, stages: ['Prelims', 'Mains'], aliases: ['crp clerk', 'customer service associate']),
+      officialUrl: _ibpsWeb, watchUrls: _ibpsWatch, stages: ['Prelims', 'Mains', 'Language test'],
+      aliases: ['crp clerk', 'crp clerks', 'crp csa', 'customer service associate', 'customer service associates']),
   CatalogExam('ibps-so', 'IBPS SO', _ibps,
-      officialUrl: _ibpsWeb, stages: _pcs, aliases: ['specialist officer', 'crp spl', 'crp so']),
+      officialUrl: _ibpsWeb, watchUrls: _ibpsWatch, stages: _pcs,
+      aliases: ['specialist officer', 'specialist officers', 'crp spl', 'crp so']),
   CatalogExam('ibps-rrb-po', 'IBPS RRB PO', _ibps,
-      officialUrl: _ibpsWeb, stages: _pcs, aliases: ['officer scale-i', 'officer scale i', 'rrb po', 'rrb officer']),
+      officialUrl: _ibpsWeb, watchUrls: _ibpsWatch, stages: _pcs,
+      aliases: ['officer scale-i', 'officer scale i', 'rrb po', 'rrb officer']),
   CatalogExam('ibps-rrb-clerk', 'IBPS RRB Clerk', _ibps,
-      officialUrl: _ibpsWeb, stages: ['Prelims', 'Mains'],
-      aliases: ['office assistant', 'rrb clerk', 'rrb office assistant', 'oa multipurpose']),
+      officialUrl: _ibpsWeb, watchUrls: _ibpsWatch, stages: ['Prelims', 'Mains'],
+      aliases: ['office assistant', 'office assistants', 'rrb clerk', 'rrb office assistant', 'oa multipurpose']),
   CatalogExam('ibps-rrb-scale-2', 'IBPS RRB Officer Scale II', _ibps,
-      officialUrl: _ibpsWeb, stages: ['Single exam', 'Interview'],
+      officialUrl: _ibpsWeb, watchUrls: _ibpsWatch, stages: ['Single exam', 'Interview'],
       aliases: ['officer scale-ii', 'officer scale ii', 'rrb scale 2', 'rrb so', 'generalist officer']),
   CatalogExam('ibps-rrb-scale-3', 'IBPS RRB Officer Scale III', _ibps,
-      officialUrl: _ibpsWeb, stages: ['Single exam', 'Interview'],
+      officialUrl: _ibpsWeb, watchUrls: _ibpsWatch, stages: ['Single exam', 'Interview'],
       aliases: ['officer scale-iii', 'officer scale iii', 'rrb scale 3']),
+  // SBI's page names the post ("Recruitment of Junior Associates"); its call
+  // letters are on IBPS's portal.
   CatalogExam('sbi-po', 'SBI PO', _sbi,
-      officialUrl: _sbiWeb, stages: ['Prelims', 'Mains', 'Interview'], aliases: ['sbi probationary officer']),
+      officialUrl: _sbiWeb, watchUrls: _sbiWatch,
+      stages: ['Prelims', 'Mains', 'Psychometric test & interview'],
+      aliases: ['sbi probationary officer', 'probationary officers']),
   CatalogExam('sbi-clerk', 'SBI Clerk', _sbi,
-      officialUrl: _sbiWeb, stages: ['Prelims', 'Mains'], aliases: ['junior associate', 'sbi ja']),
-  CatalogExam('sbi-so', 'SBI SO', _sbi, officialUrl: _sbiWeb, stages: ['Online test', 'Interview'],
-      aliases: ['sbi specialist']),
+      officialUrl: _sbiWeb, watchUrls: _sbiWatch, stages: ['Prelims', 'Mains', 'Language test'],
+      aliases: ['junior associate', 'junior associates', 'sbi ja']),
+  CatalogExam('sbi-so', 'SBI SO', _sbi,
+      officialUrl: _sbiWeb, watchUrls: _sbiWatch, stages: ['Online test', 'Interview'],
+      aliases: ['sbi specialist', 'specialist cadre officers']),
   CatalogExam('rbi-grade-b', 'RBI Grade B', _rbi,
-      officialUrl: _rbiWeb, stages: ['Phase-1', 'Phase-2', 'Interview'], aliases: ['officers in grade b']),
+      officialUrl: _rbiWeb, watchUrls: _rbiWatch, stages: ['Phase-1', 'Phase-2', 'Interview'],
+      aliases: ['officers in grade b']),
   CatalogExam('rbi-assistant', 'RBI Assistant', _rbi,
-      officialUrl: _rbiWeb, stages: ['Prelims', 'Mains', 'Language test']),
+      officialUrl: _rbiWeb, watchUrls: _rbiWatch, stages: ['Prelims', 'Mains', 'Language test'],
+      aliases: ['post of assistant']),
   CatalogExam('nabard-grade-a', 'NABARD Grade A', 'NABARD',
-      officialUrl: 'https://www.nabard.org', stages: ['Phase-1', 'Phase-2', 'Interview'],
-      aliases: ['nabard assistant manager']),
+      officialUrl: 'https://www.nabard.org', watchUrls: _nabardWatch, stages: ['Phase-1', 'Phase-2', 'Interview'],
+      aliases: ['nabard assistant manager', 'grade a']),
   CatalogExam('nabard-da', 'NABARD Development Assistant', 'NABARD',
-      officialUrl: 'https://www.nabard.org', stages: ['Prelims', 'Mains', 'Language test'],
+      officialUrl: 'https://www.nabard.org', watchUrls: _nabardWatch, stages: ['Prelims', 'Mains', 'Language test'],
       aliases: ['nabard office attendant', 'development assistant']),
   CatalogExam('rbi-office-attendant', 'RBI Office Attendant', _rbi,
-      officialUrl: _rbiWeb, stages: ['Online test', 'Language test']),
+      officialUrl: _rbiWeb, watchUrls: _rbiWatch, stages: ['Online test', 'Language test']),
   CatalogExam('lic-ado', 'LIC ADO', 'Life Insurance Corporation of India',
       officialUrl: 'https://licindia.in', stages: _pcs, aliases: ['apprentice development officer']),
   CatalogExam('lic-assistant', 'LIC Assistant', 'Life Insurance Corporation of India',
@@ -163,11 +189,11 @@ const List<CatalogExam> examCatalog = [
   // ---- Railways
   CatalogExam('rrb-ntpc-graduate', 'RRB NTPC (Graduate)', _rrb,
       officialUrl: _rrbWeb, loginUrl: _rrbLogin,
-      stages: ['CBT-1', 'CBT-2', 'Skill test', 'Document verification'],
+      stages: ['CBT-1', 'CBT-2', 'Skill test', 'Document verification', 'Medical'],
       aliases: ['ntpc graduate', 'non technical popular categories graduate', 'rrb ntpc']),
   CatalogExam('rrb-ntpc-ug', 'RRB NTPC (Under graduate)', _rrb,
       officialUrl: _rrbWeb, loginUrl: _rrbLogin,
-      stages: ['CBT-1', 'CBT-2', 'Skill test', 'Document verification'],
+      stages: ['CBT-1', 'CBT-2', 'Skill test', 'Document verification', 'Medical'],
       aliases: ['ntpc under graduate', 'ntpc undergraduate', 'ntpc 12th']),
   CatalogExam('rrb-group-d', 'RRB Group D', _rrb,
       officialUrl: _rrbWeb, loginUrl: _rrbLogin, stages: ['CBT', 'PET', 'Document verification'],

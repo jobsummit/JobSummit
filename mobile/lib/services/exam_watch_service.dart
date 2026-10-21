@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../domain/exam_watcher.dart';
+import '../models/links.dart';
 import '../models/tracked_application.dart';
 import 'data_source.dart';
 import 'database_service.dart';
@@ -77,23 +78,28 @@ class ExamWatchService {
       final known = {for (final u in app.updates) canonicalUrl(u.url)};
       final detected = <DetectedUpdate>[];
       final round = ExamRound.of(app);
-      // The board's site; a job site's article only when the board's isn't known.
+      // The board's site (a job site's article only when the board's isn't known),
+      // and where the board posts call letters and results (IBPS, SBI, RBI, NABARD).
       final portal = app.officialUrl;
-      if (portal != null && portal.isNotEmpty) {
-        final links = pages.containsKey(portal) ? pages[portal] : (pages[portal] = await _pageLinks(portal));
-        if (links != null) {
-          detected.addAll(detectUpdates(
-            links,
-            examName: app.examName,
-            organization: app.organization,
-            source: UpdateSource.official,
-            examSpecificPage: isExamSpecificPage(portal),
-            knownUrls: known,
-            now: at,
-            stage: app.tierName,
-            round: round,
-          ));
-        }
+      final boardPages = <String, bool>{
+        if (portal != null && portal.isNotEmpty) portal: isExamSpecificPage(portal),
+        for (final url in app.catalogExam?.watchUrls ?? const <String>[]) url: false,
+      };
+      for (final MapEntry(key: url, value: specific) in boardPages.entries) {
+        final links = pages.containsKey(url) ? pages[url] : (pages[url] = await _pageLinks(url));
+        if (links == null) continue;
+        detected.addAll(detectUpdates(
+          links,
+          examName: app.examName,
+          organization: app.organization,
+          source: UpdateSource.official,
+          examSpecificPage: specific,
+          boardsOwnPage: !isJobSite(url),
+          knownUrls: {...known, for (final d in detected) d.url},
+          now: at,
+          stage: app.tierName,
+          round: round,
+        ));
       }
       detected.addAll(detectUpdates(
         notices,

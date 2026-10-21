@@ -117,7 +117,12 @@ class TrackedAppsNotifier extends AsyncNotifier<List<TrackedApplication>> {
         .read(xpProvider.notifier)
         .award(XpAction.appliedToJob, key: xpExamKey(jobPostId: item.jobPostId, examName: item.examName)));
     final timeline = item.timelineJson;
-    if (timeline != null) await _db.saveTimeline(item.jobPostId, jsonEncode(timeline));
+    // With the advert number: the exam watcher tells this recruitment from others.
+    final advert = item.job?.advertisementNo;
+    if (timeline != null) {
+      await _db.saveTimeline(
+          item.jobPostId, jsonEncode({...timeline, if (advert != null) 'advertisement_no': advert}));
+    }
     await reload();
     _changed();
     unawaited(_addToCalendar([app]));
