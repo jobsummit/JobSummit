@@ -1,5 +1,6 @@
-# Serverless backend: every 4 hours, find new recruitment notifications, read their
-# PDFs with Gemini and publish the results for the app.
+# Serverless backend: every 2 hours, find new recruitment notifications, read their
+# PDFs with Gemini and publish the results for the app. Admit card / answer key /
+# result notices also come every 30 minutes from notices.yml (no AI).
 #
 #   data branch (force-pushed, one commit, no history):
 #     jobs.json      open jobs with eligibility rules  -> the app's feed
@@ -21,7 +22,7 @@ name: Data pipeline
 
 on:
   schedule:
-    - cron: "17 */4 * * *" # 00:17, 04:17 … UTC (GitHub may start scheduled runs late)
+    - cron: "17 */2 * * *" # 00:17, 02:17 … UTC (GitHub may start scheduled runs late)
   workflow_dispatch:
     inputs:
       fresh_start:
@@ -60,11 +61,12 @@ jobs:
       API_KEY: not-used-in-pipeline
       JWT_SECRET: not-used-in-the-pipeline-but-must-be-32-chars-long
       GOOGLE_CLIENT_IDS: '[]'
-      # Runs are 4 h apart; slightly shorter so every source is due on every run.
-      CRAWL_INTERVAL_HOURS: "3.5"
+      # Runs are 2 h apart; slightly shorter so every source is due on every run.
+      CRAWL_INTERVAL_HOURS: "1.75"
       CRAWL_JITTER_MINUTES: "10"
-      # Job pages are cheap to open (no Gemini), so clear the queue faster.
-      AGGREGATOR_DETAIL_PAGES_PER_RUN: "80"
+      # Job pages are cheap to open (no Gemini). 40 a run, 12 runs a day: as many visits
+      # to the job sites as 80 every 4 hours.
+      AGGREGATOR_DETAIL_PAGES_PER_RUN: "40"
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 

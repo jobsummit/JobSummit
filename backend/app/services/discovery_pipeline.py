@@ -55,19 +55,26 @@ MAX_ATTEMPTS = 3
 
 
 async def run_due_crawls(
-    session_factory: SessionFactory, fetcher: Fetcher, settings: Settings | None = None
+    session_factory: SessionFactory,
+    fetcher: Fetcher,
+    settings: Settings | None = None,
+    *,
+    only: Callable[[str], bool] | None = None,
 ) -> int:
+    """Crawls the sources that are due. With ``only`` (a test on the source's URL),
+    just those sources, due or not: the quick notices run reads the admit card /
+    answer key / result sections every time."""
     settings = settings or get_settings()
     now = datetime.now(UTC)
     async with session_factory() as session:
+        query = select(Source.id, Source.url).where(Source.enabled)
+        if only is None:
+            query = query.where(or_(Source.next_check_at.is_(None), Source.next_check_at <= now))
         due = (
-            await session.execute(
-                select(Source.id, Source.url)
-                .where(Source.enabled, or_(Source.next_check_at.is_(None), Source.next_check_at <= now))
-                .order_by(Source.next_check_at.asc().nulls_first())
-                .limit(100)
-            )
+            await session.execute(query.order_by(Source.next_check_at.asc().nulls_first()).limit(100))
         ).all()
+    if only is not None:
+        due = [row for row in due if only(row.url)]
     if not due:
         return 0
 

@@ -354,6 +354,84 @@ async def run(
     return stats
 
 
+async def reuse_links(previous: Path | None) -> None:
+    """Official links already found (in the last notices.json) are not looked up again:
+    the quick run doesn't save its database, so it would open those pages every time."""
+    if previous is None or not previous.exists():
+        return
+    try:
+        known = {
+            n["url"]: n["link"]
+            for n in json.loads(previous.read_text(encoding="utf-8")).get("notices", [])
+            if n.get("url") and n.get("link")
+        }
+    except (ValueError, KeyError, TypeError):
+        return
+    if not known:
+        return
+    async with SessionLocal() as session:
+        items = await session.scalars(
+            select(DiscoveredItem).where(
+                DiscoveredItem.kind == ItemKind.ALERT,
+                DiscoveredItem.apply_url.is_(None),
+                DiscoveredItem.url.in_(list(known)),
+            )
+        )
+        for item in items:
+            item.apply_url = known[item.url][:2000]
+        await session.commit()
+
+
+async def run_notices(
+    out: Path, previous: Path | None = None, budget_minutes: float = 8
+) -> dict[str, object]:
+    """The quick run (every 30 minutes): only the Admit Card / Answer Key / Result
+    sections, then notices.json. No PDFs, no AI, jobs.json untouched."""
+    settings = get_settings()
+    started = datetime.now(UTC)
+    budget = Budget(budget_minutes)
+    stopped: list[str] = []
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+        for ddl in ADDED_COLUMNS:
+            await conn.execute(text(ddl))
+    async with SessionLocal() as session:
+        await ensure_seed_sources(session)
+    fetcher = Fetcher(
+        user_agent=settings.scraper_user_agent,
+        timeout_s=settings.fetch_timeout_s,
+        per_host_min_interval_s=settings.per_host_min_interval_s,
+        respect_robots=settings.respect_robots_txt,
+        extra_ca_bundle=settings.extra_ca_bundle,
+        allow_legacy_tls_renegotiation=settings.tls_allow_legacy_renegotiation,
+    )
+    stats: dict[str, object] = {"schema": SCHEMA_VERSION, "started_at": started.isoformat()}
+    try:
+        stats["sources_crawled"] = await timeboxed(
+            "crawl",
+            run_due_crawls(
+                SessionLocal, fetcher, settings, only=lambda url: section_milestone(url) is not None
+            ),
+            budget.left(3 * 60),
+            stopped,
+        )
+        await reuse_links(previous)
+        async with SessionLocal() as session:
+            stats["notice_links"] = await timeboxed(
+                "notice_links", resolve_notice_links(session, fetcher), budget.left(), stopped
+            )
+        stats["stopped_early"] = stopped
+        async with SessionLocal() as session:
+            notices = await build_notices_file(session, now=datetime.now(UTC))
+    finally:
+        await fetcher.aclose()
+        await engine.dispose()
+    write_json(out / "notices.json", notices)
+    stats.update(finished_at=datetime.now(UTC).isoformat(), notices=len(notices["notices"]))
+    write_json(out / "status-notices.json", stats)
+    return stats
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path, required=True, help="folder for jobs.json / notices.json")
@@ -364,12 +442,17 @@ def main() -> None:
         help="most ingest rounds per run (INGEST_BATCH_SIZE PDFs each)",
     )
     parser.add_argument("--ingest-minutes", type=int, default=25, help="time budget for reading PDFs")
+    parser.add_argument("--budget-minutes", type=float, default=36, help="whole run, publishing included")
     parser.add_argument(
-        "--budget-minutes", type=float, default=36, help="whole run, publishing included"
+        "--notices-only", action="store_true", help="quick run: admit card / answer key / result notices only"
     )
+    parser.add_argument("--previous", type=Path, help="the last notices.json (its links are reused)")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    stats = asyncio.run(run(args.out, args.ingest_rounds, args.ingest_minutes, args.budget_minutes))
+    if args.notices_only:
+        stats = asyncio.run(run_notices(args.out, args.previous))
+    else:
+        stats = asyncio.run(run(args.out, args.ingest_rounds, args.ingest_minutes, args.budget_minutes))
     log.info("Done: %s", stats)
 
 

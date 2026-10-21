@@ -1,0 +1,108 @@
+# Quick run, every 30 minutes: admit card / answer key / result notices only, so
+# the app's exam watcher hears about them within the half hour. No PDFs, no AI:
+# three requests to SarkariResult's notice feed, plus each new notice's page once
+# (for its official link). jobs.json is left as it is.
+#
+# It reads the main pipeline's saved state but doesn't save its own (only the main
+# run in data-pipeline.yml does), and adds notices.json to the data branch as a new
+# commit; the main run's next force-push folds it back into one.
+
+name: Notices
+
+on:
+  schedule:
+    - cron: "7,37 * * * *" # GitHub may start scheduled runs late
+  workflow_dispatch:
+
+permissions:
+  contents: write # push the data branch
+  actions: write # keep this scheduled workflow switched on (last step)
+
+concurrency:
+  group: notices
+  cancel-in-progress: false
+
+jobs:
+  notices:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql+asyncpg://tracker:tracker@localhost:5432/tracker
+      PGURL: postgresql://tracker:tracker@localhost:5432/tracker
+      GEMINI_API_KEY: unset
+      UPLOAD_DIR: /tmp/notifications
+      # The server-only settings still need values to load the shared config.
+      API_KEY: not-used-in-pipeline
+      JWT_SECRET: not-used-in-the-pipeline-but-must-be-32-chars-long
+      GOOGLE_CLIENT_IDS: '[]'
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install
+        run: |
+          pip install -r backend/requirements.txt
+          echo "VAULT_KEY=$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')" >> "$GITHUB_ENV"
+
+      - name: Start PostgreSQL
+        run: |
+          sudo systemctl start postgresql.service
+          sudo -u postgres psql -qc "CREATE USER tracker WITH SUPERUSER PASSWORD 'tracker';"
+          sudo -u postgres psql -qc "CREATE DATABASE tracker OWNER tracker;"
+
+      - name: Restore the main run's state
+        run: |
+          git fetch --depth=1 origin data
+          want=$(python -c "import sys; sys.path.insert(0,'backend'); from app.services.publish import SCHEMA_VERSION as v; print(v)")
+          have=$(git show FETCH_HEAD:state/schema 2>/dev/null || echo none)
+          if [ "$want" != "$have" ]; then
+            echo "::notice::Saved state is schema $have, code wants $want: waiting for the main run."
+            echo "SKIP=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          git show FETCH_HEAD:state/db.sql.gz | gunzip | psql -q "$PGURL" >/dev/null
+          git show FETCH_HEAD:notices.json > /tmp/previous_notices.json 2>/dev/null || true
+
+      - name: Collect notices
+        if: ${{ env.SKIP != '1' }}
+        working-directory: backend
+        run: python scripts/run_pipeline.py --notices-only --out ../publish --previous /tmp/previous_notices.json
+
+      - name: Add them to the data branch
+        if: ${{ env.SKIP != '1' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git config --global user.name "JobSummit pipeline"
+          git config --global user.email "actions@users.noreply.github.com"
+          # The main run may force-push in between: start again from the new tip.
+          for attempt in 1 2 3; do
+            rm -rf /tmp/data && git worktree prune
+            git fetch -q --depth=1 "$remote" data
+            git worktree add -f --detach /tmp/data FETCH_HEAD
+            if python -c "import json,sys; a,b=(json.load(open(f,encoding='utf-8')).get('notices') for f in sys.argv[1:]); sys.exit(0 if a==b else 1)" publish/notices.json /tmp/data/notices.json 2>/dev/null; then
+              echo "No new notices."
+              exit 0
+            fi
+            cp publish/notices.json publish/status-notices.json /tmp/data/
+            git -C /tmp/data add notices.json status-notices.json
+            git -C /tmp/data commit -qm "Notices $(date -u +%Y-%m-%dT%H:%MZ)"
+            if git -C /tmp/data push -q "$remote" HEAD:data; then
+              exit 0
+            fi
+            git worktree remove -f /tmp/data
+            sleep 10
+          done
+          echo "::warning::Could not add the notices; the next run will."
+
+      - name: Keep the schedule switched on
+        if: ${{ !cancelled() && github.event_name == 'schedule' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/notices.yml/enable"
