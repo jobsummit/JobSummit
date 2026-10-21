@@ -2,7 +2,7 @@ name: exam_tracker
 description: ADHD-first tracker for Indian Govt/PSU recruitment exams.
 publish_to: "none"
 # +N is the release number the in-app updater compares (see RELEASING.md).
-version: 0.17.1+29
+version: 0.17.2+30
 
 environment:
   sdk: ">=3.6.0 <4.0.0"
