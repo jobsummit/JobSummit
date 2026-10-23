@@ -1,7 +1,8 @@
 # Quick run, every 30 minutes: admit card / answer key / result notices only, so
-# the app's exam watcher hears about them within the half hour. No PDFs, no AI:
-# three requests to SarkariResult's notice feed, plus each new notice's page once
-# (for its official link). jobs.json is left as it is.
+# the app's exam watcher hears about them within the half hour. No PDFs: three
+# requests to SarkariResult's notice feed, each new notice's page once (for its
+# official link), and Mistral labels new notices once (which exam, round, stage).
+# jobs.json is left as it is.
 #
 # It reads the main pipeline's saved state but doesn't save its own (only the main
 # run in data-pipeline.yml does), and adds notices.json to the data branch as a new
@@ -30,6 +31,10 @@ jobs:
       DATABASE_URL: postgresql+asyncpg://tracker:tracker@localhost:5432/tracker
       PGURL: postgresql://tracker:tracker@localhost:5432/tracker
       GEMINI_API_KEY: unset
+      # Mistral labels each new notice once (which exam, round, stage): a few
+      # requests a day. Without the key notices go unlabelled.
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY || '' }}
+      MISTRAL_MODELS: ${{ vars.MISTRAL_MODELS || 'ministral-14b-latest,ministral-8b-latest,mistral-small-latest' }}
       UPLOAD_DIR: /tmp/notifications
       # The server-only settings still need values to load the shared config.
       API_KEY: not-used-in-pipeline

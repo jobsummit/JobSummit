@@ -42,6 +42,7 @@ from app.services.discovery_pipeline import (  # noqa: E402
     run_due_crawls,
 )
 from app.services.http_fetcher import Fetcher  # noqa: E402
+from app.services.notice_labels import label_notices, previous_labels  # noqa: E402
 from app.services.pdf_parser import quota_left, usage  # noqa: E402
 from app.services.publish import SCHEMA_VERSION, build_jobs_file, build_notices_file  # noqa: E402
 from app.services.scraper_service import (  # noqa: E402
@@ -259,7 +260,11 @@ def write_json(path: Path, data: object) -> None:
 
 
 async def run(
-    out: Path, ingest_rounds: int, ingest_minutes: int = 25, budget_minutes: float = 36
+    out: Path,
+    ingest_rounds: int,
+    ingest_minutes: int = 25,
+    budget_minutes: float = 36,
+    previous: Path | None = None,
 ) -> dict[str, object]:
     settings = get_settings()
     started = datetime.now(UTC)
@@ -311,7 +316,8 @@ async def run(
             # Each PDF gets one try per run; a round still running at the deadline
             # (Gemini slow and retrying) is cancelled.
             attempted: set = set()
-            ingest_until = time.monotonic() + budget.left(ingest_minutes * 60)
+            # Two minutes stay for Mistral's notice labels at the end.
+            ingest_until = time.monotonic() + max(0.0, budget.left(ingest_minutes * 60) - 120)
             for _ in range(ingest_rounds):
                 left = ingest_until - time.monotonic()
                 if await pending_pdfs() <= len(attempted) or left <= 0:
@@ -344,6 +350,13 @@ async def run(
             jobs = await build_jobs_file(session, now=now)
             notices = await build_notices_file(session, now=now)
             stats["watchlist_missing"] = await watchlist_missing(session, jobs, now)
+        stats["label_requests"] = await timeboxed(
+            "labels",
+            label_notices(notices["notices"], previous_labels(previous)),
+            budget.left(3 * 60),
+            stopped,
+        )
+        stats["stopped_early"] = stopped
     finally:
         await fetcher.aclose()
         await engine.dispose()
@@ -388,7 +401,7 @@ async def reuse_links(previous: Path | None) -> None:
 
 
 async def run_notices(
-    out: Path, previous: Path | None = None, budget_minutes: float = 8
+    out: Path, previous: Path | None = None, budget_minutes: float = 10
 ) -> dict[str, object]:
     """The quick run (every 30 minutes): only the Admit Card / Answer Key / Result
     sections, then notices.json. No PDFs, no AI, jobs.json untouched."""
@@ -423,11 +436,17 @@ async def run_notices(
         await reuse_links(previous)
         async with SessionLocal() as session:
             stats["notice_links"] = await timeboxed(
-                "notice_links", resolve_notice_links(session, fetcher), budget.left(), stopped
+                "notice_links", resolve_notice_links(session, fetcher), budget.left(3 * 60), stopped
             )
-        stats["stopped_early"] = stopped
         async with SessionLocal() as session:
             notices = await build_notices_file(session, now=datetime.now(UTC))
+        stats["label_requests"] = await timeboxed(
+            "labels",
+            label_notices(notices["notices"], previous_labels(previous)),
+            budget.left(3 * 60),
+            stopped,
+        )
+        stats["stopped_early"] = stopped
     finally:
         await fetcher.aclose()
         await engine.dispose()
@@ -457,7 +476,9 @@ def main() -> None:
     if args.notices_only:
         stats = asyncio.run(run_notices(args.out, args.previous))
     else:
-        stats = asyncio.run(run(args.out, args.ingest_rounds, args.ingest_minutes, args.budget_minutes))
+        stats = asyncio.run(
+            run(args.out, args.ingest_rounds, args.ingest_minutes, args.budget_minutes, args.previous)
+        )
     log.info("Done: %s", stats)
 
 

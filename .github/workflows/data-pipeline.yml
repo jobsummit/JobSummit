@@ -97,6 +97,8 @@ jobs:
             if [ "$want" = "$have" ]; then
               git show FETCH_HEAD:state/db.sql.gz | gunzip | psql -q "$PGURL" >/dev/null
               echo "Restored state (schema $have)."
+              # Its notice labels (Mistral's) are reused, not asked again.
+              git show FETCH_HEAD:notices.json > /tmp/previous_notices.json 2>/dev/null || true
             else
               echo "::notice::Saved state is schema $have, code wants $want: starting fresh."
             fi
@@ -106,7 +108,7 @@ jobs:
 
       - name: Crawl, read PDFs, publish
         working-directory: backend
-        run: python scripts/run_pipeline.py --out ../publish
+        run: python scripts/run_pipeline.py --out ../publish --previous /tmp/previous_notices.json
 
       # Private workspace (optional module, backend/app/modules/private_jobs): its own
       # step, after the Govt data is built, so a failure here never blocks it. The last
