@@ -145,6 +145,7 @@ class ExamWatchService {
           detectedAt: at,
           source: d.source.name,
           publishedAt: d.publishedAt,
+          examId: d.examId,
         ),
       ...app.updates,
     ].take(_keepUpdates).toList();
@@ -230,6 +231,7 @@ class ExamWatchService {
               title: n['title'] as String? ?? '',
               link: n['link'] as String?,
               publishedAt: n['published_at'] is String ? DateTime.tryParse(n['published_at'] as String) : null,
+              about: NoticeAbout.fromJson(n['about']),
             ),
       ];
     } catch (_) {

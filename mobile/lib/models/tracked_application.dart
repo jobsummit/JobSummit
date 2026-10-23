@@ -53,6 +53,7 @@ class ExamUpdate {
     this.source,
     this.link,
     this.publishedAt,
+    this.examId,
   });
 
   final String milestone; // admit_card | exam_schedule | postponed | answer_key | result
@@ -74,6 +75,9 @@ class ExamUpdate {
   /// When the job site posted it (notices.json), if known.
   final DateTime? publishedAt;
 
+  /// The exam list id Mistral read it as (notices.json `about.exam`), if any.
+  final String? examId;
+
   static DateTime? _day(Object? v) {
     final d = v is String ? DateTime.tryParse(v) : null;
     return d == null ? null : DateTime(d.year, d.month, d.day);
@@ -91,6 +95,7 @@ class ExamUpdate {
         source: j['source'] as String?,
         link: j['link'] as String?,
         publishedAt: j['published_at'] is String ? DateTime.tryParse(j['published_at'] as String) : null,
+        examId: j['exam'] as String?,
       );
 
   Map<String, Object?> toJson() => {
@@ -102,6 +107,7 @@ class ExamUpdate {
         'source': source,
         if (link != null) 'link': link,
         if (publishedAt != null) 'published_at': publishedAt!.toUtc().toIso8601String(),
+        if (examId != null) 'exam': examId,
       };
 }
 

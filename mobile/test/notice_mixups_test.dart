@@ -69,9 +69,59 @@ void main() {
     expect(found(grad, ['RRB Ministerial & Isolated Category Junior Translator (Hindi) CBT Result 2026']), isEmpty);
   });
 
+  group('with Mistral labels', () {
+    const cbtst = ('RRB NTPC Graduate Level CBTST Admit Card 2026',
+        NoticeAbout(exam: 'rrb-ntpc-graduate', year: '2026', stage: 'skill'));
+    test('the label decides the exam and the stage', () {
+      expect(foundLabelled(ug, [cbtst]), isEmpty);
+      expect(foundLabelled(grad, [cbtst]), isEmpty, reason: 'tracked at CBT-1');
+      final atSkill = manual('RRB NTPC (Graduate) 2026', rrb, ntpcStages, tier: 2);
+      expect(foundLabelled(atSkill, [cbtst]), hasLength(1));
+    });
+
+    test('a title the words miss still counts when the label names the exam', () {
+      const terse = ('CEN 06/2026 Graduate posts: CBT-1 Admit Card',
+          NoticeAbout(exam: 'rrb-ntpc-graduate', advert: 'CEN 06/2026', stage: 'cbt-1'));
+      expect(foundLabelled(grad, [terse]), hasLength(1));
+    });
+
+    test('the advert number in the label keeps other rounds out', () {
+      const older = ('RRB NTPC Graduate CBT-1 Result',
+          NoticeAbout(exam: 'rrb-ntpc-graduate', advert: 'CEN 05/2024', stage: 'cbt-1'));
+      expect(foundLabelled(grad, [older]), isEmpty);
+    });
+
+    test('a stored notice labelled as another exam comes off', () {
+      final stored = ExamUpdate(
+        milestone: 'admit_card',
+        title: 'RRB NTPC Graduate Level CBTST Admit Card 2026',
+        url: 'https://agg.example/x',
+        detectedAt: DateTime.utc(2026, 10, 22),
+        examId: 'rrb-ntpc-graduate',
+      );
+      expect(ExamUpdate.fromJson(stored.toJson()).examId, 'rrb-ntpc-graduate');
+      expect(isStrayUpdate(ug, stored), isTrue);
+    });
+  });
+
   test('its own round still counts; another round does not', () {
     expect(found(oa, ['IBPS RRB XV Office Assistant Prelims Admit Card 2026']), hasLength(1));
     expect(found(oa, ['IBPS RRB XIV Office Assistant Prelims Result']), isEmpty);
     expect(roundNumerals('RRB NTPC CBT-II Answer Key'), isEmpty, reason: 'a stage, not a round');
   });
 }
+
+List<String> foundLabelled(TrackedApplication app, List<(String, NoticeAbout)> notices) => [
+      for (final u in detectUpdates(
+        [for (final (i, (t, a)) in notices.indexed) PageLink(url: 'https://agg.example/l$i', title: t, about: a)],
+        examName: app.examName,
+        organization: app.organization,
+        source: UpdateSource.aggregator,
+        examSpecificPage: false,
+        knownUrls: const {},
+        now: DateTime.utc(2026, 10, 24),
+        stage: app.tierName,
+        round: ExamRound.of(app),
+      ))
+        u.title,
+    ];

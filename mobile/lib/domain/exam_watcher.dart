@@ -529,10 +529,42 @@ bool isExamSpecificPage(String url) {
 // --- Links ---------------------------------------------------------------------------
 
 /// A link on a page (or in notices.json) with the text around it.
+/// What Mistral read a notice as (notices.json `about`): which exam of the app's
+/// list, which round, which stage. Null fields: not printed, or not one of the list.
+@immutable
+class NoticeAbout {
+  const NoticeAbout({this.exam, this.advert, this.year, this.numeral, this.stage});
+
+  /// An exam list id ("rrb-ntpc-ug"), or null: none of the list.
+  final String? exam;
+  final String? advert;
+  final String? year;
+  final String? numeral;
+
+  /// A [stageKey] key ("cbt-1", "skill", "mains").
+  final String? stage;
+
+  static NoticeAbout? fromJson(Object? j) {
+    if (j is! Map) return null;
+    String? s(String k) => j[k] is String && (j[k] as String).isNotEmpty ? j[k] as String : null;
+    return NoticeAbout(exam: s('exam'), advert: s('advert'), year: s('year'), numeral: s('numeral'), stage: s('stage'));
+  }
+
+  /// The round it names, as text the round checks read ("CEN 06/2025 2026 XV").
+  String get roundText => [advert, year, numeral].whereType<String>().join(' ');
+}
+
 @immutable
 class PageLink {
-  const PageLink(
-      {required this.url, required this.title, this.context = '', this.heading = '', this.link, this.publishedAt});
+  const PageLink({
+    required this.url,
+    required this.title,
+    this.context = '',
+    this.heading = '',
+    this.link,
+    this.publishedAt,
+    this.about,
+  });
 
   final String url;
   final String title;
@@ -547,6 +579,9 @@ class PageLink {
 
   /// notices.json: when the job site posted it.
   final DateTime? publishedAt;
+
+  /// notices.json: Mistral's reading of it.
+  final NoticeAbout? about;
 }
 
 final _tracking = RegExp(r'^(utm_|fbclid|gclid|ref$|amp$)');
@@ -579,6 +614,7 @@ class DetectedUpdate {
     this.eventEnd,
     this.link,
     this.publishedAt,
+    this.examId,
   });
 
   final Milestone milestone;
@@ -587,6 +623,9 @@ class DetectedUpdate {
   final UpdateSource source;
   final DateTime? eventDate;
   final DateTime? publishedAt;
+
+  /// The exam list id Mistral gave the notice, if any.
+  final String? examId;
 
   /// The official link for it (admit card download, answer key, result), if known.
   final String? link;
@@ -615,6 +654,7 @@ List<DetectedUpdate> detectUpdates(
   final seen = {...knownUrls};
   final at = now ?? DateTime.now();
   final thisRound = round ?? ExamRound(years: _years(examName), numerals: roundNumerals(examName));
+  final mine = matchCatalogExam('$examName ${organization ?? ''}');
   for (final link in links) {
     final url = canonicalUrl(link.url);
     if (seen.contains(url)) continue;
@@ -623,12 +663,21 @@ List<DetectedUpdate> detectUpdates(
     if (milestone == null) continue;
     // What's out comes from the link and its row; which exam, from its section only
     // when the link itself names none ("Download call letter").
-    final about = _bareLink(text) ? '$text ${link.heading}'.trim() : text;
+    final label = link.about;
+    final about = [
+      if (_bareLink(text)) '$text ${link.heading}'.trim() else text,
+      if (label != null) label.roundText,
+    ].join(' ').trim();
     if (!thisRound.admits(about, milestone, link.publishedAt ?? at)) continue;
     if (namesAnotherStage(text, stage)) continue; // a Tier 1 notice for an exam tracked at Tier-2
+    if (label != null && _labelSaysOtherStage(label, stage)) continue;
+    // Mistral's reading decides which exam when it names one of the list.
+    final labelled = label?.exam != null && mine != null;
+    if (labelled && label!.exam != mine.id) continue;
     // A job site's page is always about many exams: it has to name this one.
     final jobSite = isJobSite(url);
-    if ((!examSpecificPage || jobSite) &&
+    if (!labelled &&
+        (!examSpecificPage || jobSite) &&
         !_namesExam(about, examName, organization, boardsPage: boardsOwnPage && !jobSite)) {
       continue;
     }
@@ -644,9 +693,16 @@ List<DetectedUpdate> detectUpdates(
       eventEnd: window?.end,
       link: link.link,
       publishedAt: link.publishedAt,
+      examId: label?.exam,
     ));
   }
   return found;
+}
+
+bool _labelSaysOtherStage(NoticeAbout label, String? trackedStage) {
+  final theirs = label.stage;
+  final mine = trackedStage == null ? null : stageKey(trackedStage);
+  return theirs != null && mine != null && theirs != mine;
 }
 
 const _bareWords = {
@@ -672,7 +728,13 @@ bool _bareLink(String text) => RegExp('[a-z]{3,}')
 bool isStrayUpdate(TrackedApplication app, ExamUpdate u, {ExamRound? round}) {
   final milestone = Milestone.fromWire(u.milestone);
   if (milestone == null) return false;
-  if (isJobSite(u.url) && !_namesExam(u.title, app.examName, app.organization)) return true;
+  final labelled = u.examId;
+  final mine = app.catalogExam;
+  if (labelled != null && mine != null) {
+    if (labelled != mine.id) return true;
+  } else if (isJobSite(u.url) && !_namesExam(u.title, app.examName, app.organization)) {
+    return true;
+  }
   if (namesAnotherStage(u.title, app.tierName)) return true;
   final seen = u.detectedAt ?? app.createdAt;
   return !(round ?? ExamRound.of(app)).admits(u.title, milestone, u.publishedAt ?? seen);
@@ -689,6 +751,7 @@ DetectedUpdate _replay(ExamUpdate u, Milestone m, DateTime seen) {
     eventEnd: w?.end,
     link: u.link,
     publishedAt: u.publishedAt,
+    examId: u.examId,
   );
 }
 
