@@ -268,6 +268,21 @@ const _stopwords = {
   'no',
 };
 const _weak = {
+  // Post words many recruitments share ("Group B Office Assistant", "Group-C
+  // Technical Assistant").
+  'group',
+  'assistant',
+  'assistants',
+  'office',
+  'officer',
+  'officers',
+  'clerk',
+  'manager',
+  'technical',
+  'grade',
+  'staff',
+  'scale',
+  'post',
   'combined',
   'level',
   'graduate',
@@ -284,9 +299,19 @@ const _weak = {
 };
 final _yearToken = RegExp(r'^(19|20)\d\d$');
 
+/// A round's numeral ("XV", "XVI"): says which round, not which exam.
+final _romanToken = RegExp(r'^(?=[ivxl]{2,}$)l?x{0,3}(ix|iv|v?i{0,3})$');
+
+/// IBPS's and RRB's words for "a round of": in every notice of theirs.
+const _roundWords = {'crp', 'cen'};
+
 Set<String> _tokens(String text) => {
       for (final m in RegExp('[a-z0-9]+').allMatches(text.toLowerCase()))
-        if (m.group(0)!.length > 1 && !_stopwords.contains(m.group(0)) && !_yearToken.hasMatch(m.group(0)!))
+        if (m.group(0)!.length > 1 &&
+            !_stopwords.contains(m.group(0)) &&
+            !_roundWords.contains(m.group(0)) &&
+            !_yearToken.hasMatch(m.group(0)!) &&
+            !_romanToken.hasMatch(m.group(0)!))
           m.group(0)!,
     };
 
@@ -327,13 +352,32 @@ bool namesThisExam(String text, String examName, String? organization) {
 /// "Result of CRP-SPL-XVI" is IBPS SO, SBI's "Recruitment of Junior Associates" is
 /// SBI Clerk.
 bool _namesExam(String text, String examName, String? organization, {bool boardsPage = false}) {
-  if (alertMatchesExam(text, examName, organization)) return true;
   // "SSC Combined Graduate Level Tier 1 Admit Card" is "SSC CGL": the exam list knows
-  // both names (and needs the board named too, so look-alikes don't match).
+  // both names (and needs the board named too, so look-alikes don't match). When it
+  // knows yours, a notice naming another exam of the list is not yours ("NTPC
+  // Graduate" for NTPC Undergraduate, "IBPS Clerk" for IBPS RRB Clerk), and one it
+  // can't place must at least name your board.
   final mine = matchCatalogExam('$examName ${organization ?? ''}');
-  if (mine == null) return false;
-  final board = boardsPage ? ' ${mine.name.split(' ').first} ${mine.board}' : '';
-  return matchCatalogExam('$text$board')?.id == mine.id;
+  if (mine != null) {
+    final board = boardsPage ? ' ${mine.name.split(' ').first} ${mine.board}' : '';
+    final theirs = matchCatalogExam('$text$board');
+    if (theirs != null) return theirs.id == mine.id;
+    if (!boardsPage && !_namesBoard(text, mine, organization)) return false;
+  }
+  return alertMatchesExam(text, examName, organization);
+}
+
+/// "IBPS", "Railway Recruitment Board", "RRB": the notice names the exam's board.
+bool _namesBoard(String text, CatalogExam exam, String? organization) {
+  final words = _tokens(text).union({for (final m in RegExp('[a-z0-9]+').allMatches(text.toLowerCase())) m[0]!});
+  final code = exam.name.split(' ').first.toLowerCase();
+  if (words.contains(code)) return true;
+  for (final name in [exam.board, if (organization != null) organization]) {
+    if (_acronyms(name).any(words.contains)) return true;
+    final named = _tokens(name);
+    if (named.isNotEmpty && words.containsAll(named)) return true;
+  }
+  return false;
 }
 
 const _romanStage = {'i': '1', 'ii': '2', 'iii': '3', 'iv': '4', 'v': '5'};
@@ -346,6 +390,13 @@ String? stageKey(String text) {
   if (RegExp(r'\b(?:prelim\w*|preliminary|pre)\b').hasMatch(t)) return 'prelims';
   if (RegExp(r'\bmains?\b').hasMatch(t)) return 'mains';
   if (RegExp(r'\b(?:interview|personality test)\b').hasMatch(t)) return 'interview';
+  // RRB's typing / aptitude tests (CBTST, CBAT), SSC's skill tests (DEST, CPT).
+  if (RegExp(r'\b(?:cbtst|cbat|typing|skill test|dest|cpt|aptitude test)\b').hasMatch(t)) return 'skill';
+  if (RegExp(r'\b(?:document verification|dv)\b').hasMatch(t)) return 'dv';
+  if (RegExp(r'^\s*medical\s*$|\bmedical (?:exam\w*|test)\b').hasMatch(t)) return 'medical';
+  if (RegExp(r'\b(?:pet|pst|pe&mt|pet / pst|pet / pmt|physical (?:efficiency|standard|test))\b').hasMatch(t)) {
+    return 'physical';
+  }
   return null;
 }
 
@@ -366,6 +417,12 @@ final _cycleYearRe = RegExp(r'(?<![\d./-])\d{1,3}\s*/\s*((?:19|20)\d{2})\b');
 
 Set<String> _cycleYears(String text) => {for (final m in _cycleYearRe.allMatches(text)) m.group(1)!};
 
+/// "xv" of "IBPS CRP RRB XV" (not the "II" of "Scale II" or "CBT-II").
+Set<String> roundNumerals(String text) => {
+      for (final r in splitQuery(text).round)
+        if (!_yearToken.hasMatch(r)) r,
+    };
+
 /// "Advertisement No: ...", "Advt. No. ...", "CEN 06/2025".
 final _namesAnAdvert =
     RegExp(r'\b(?:advertisement|advt)\.?\s*(?:no|number)\b|\bcen\s*(?:no\.?\s*)?\d', caseSensitive: false);
@@ -378,8 +435,14 @@ const _afterForm = {Milestone.admitCard, Milestone.answerKey, Milestone.result};
 /// list of other exams) never moves the exam along.
 @immutable
 class ExamRound {
-  const ExamRound(
-      {this.years = const {}, this.formOpens, this.formCloses, this.knownDates = const [], this.advert});
+  const ExamRound({
+    this.years = const {},
+    this.formOpens,
+    this.formCloses,
+    this.knownDates = const [],
+    this.advert,
+    this.numerals = const {},
+  });
 
   /// From the exam's name ("SSC CGL 2026"), else the year its form opened.
   factory ExamRound.of(TrackedApplication app) {
@@ -396,6 +459,7 @@ class ExamRound {
         for (final d in [app.timeline?.examStart, app.timeline?.examEnd, app.examAt]) if (d != null) d,
       ],
       advert: advertKey(raw['advertisement_no'] as String?),
+      numerals: roundNumerals(app.examName),
     );
   }
 
@@ -406,6 +470,10 @@ class ExamRound {
 
   /// Its exam dates, once known: their years count too.
   final List<DateTime> knownDates;
+
+  /// IBPS-style round numerals in its name ("XV" of "IBPS CRP RRB XV"): a notice
+  /// naming other ones ("XVI") is another round.
+  final Set<String> numerals;
 
   /// Its advertisement number ([advertKey] form), saved when you applied from the
   /// Jobs list: a notice naming another one ("CEN 06/2025", SBI's other "Specialist
@@ -427,6 +495,10 @@ class ExamRound {
     final advert = this.advert;
     if (advert != null && !'-${advertKey(text) ?? ''}-'.contains('-$advert-') && _namesAnAdvert.hasMatch(text)) {
       return false;
+    }
+    if (numerals.isNotEmpty) {
+      final theirs = roundNumerals(text);
+      if (theirs.isNotEmpty && theirs.intersection(numerals).isEmpty) return false;
     }
     if (years.isNotEmpty) {
       final cycle = _cycleYears(text);
@@ -542,15 +614,16 @@ List<DetectedUpdate> detectUpdates(
   final found = <DetectedUpdate>[];
   final seen = {...knownUrls};
   final at = now ?? DateTime.now();
-  final thisRound = round ?? ExamRound(years: _years(examName));
+  final thisRound = round ?? ExamRound(years: _years(examName), numerals: roundNumerals(examName));
   for (final link in links) {
     final url = canonicalUrl(link.url);
     if (seen.contains(url)) continue;
     final text = '${link.title} ${link.context}'.trim();
     final milestone = classifyMilestone(text);
     if (milestone == null) continue;
-    // What's out comes from the link and its row; which exam, also from its section.
-    final about = '$text ${link.heading}'.trim();
+    // What's out comes from the link and its row; which exam, from its section only
+    // when the link itself names none ("Download call letter").
+    final about = _bareLink(text) ? '$text ${link.heading}'.trim() : text;
     if (!thisRound.admits(about, milestone, link.publishedAt ?? at)) continue;
     if (namesAnotherStage(text, stage)) continue; // a Tier 1 notice for an exam tracked at Tier-2
     // A job site's page is always about many exams: it has to name this one.
@@ -575,6 +648,24 @@ List<DetectedUpdate> detectUpdates(
   }
   return found;
 }
+
+const _bareWords = {
+  'download', 'click', 'here', 'link', 'view', 'print', 'reprint', 'check', 'see', 'call', 'letter', 'letters', //
+  'admit', 'card', 'cards', 'hall', 'ticket', 'result', 'results', 'answer', 'key', 'keys', 'objection',
+  'examination', 'exam', 'exams', 'online', 'written', 'test', 'preliminary', 'prelims', 'pre', 'main', 'mains',
+  'phase', 'final', 'select', 'selected', 'selection', 'list', 'wait', 'provisional', 'provisionally',
+  'shortlisted', 'candidates', 'candidate', 'marks', 'secured', 'score', 'scores', 'scorecard', 'cut', 'off',
+  'offs', 'cutoff', 'cutoffs', 'roll', 'nos', 'numbers', 'interview', 'schedule', 'notice', 'information',
+  'handout', 'status', 'new', 'pdf', 'english', 'hindi', 'the', 'of', 'for', 'in', 'by', 'and', 'to', 'from', 'kb',
+  'mb', 'date', 'dates', 'city', 'intimation', 'slip', 'psychometric', 'group', 'exercise', 'document',
+  'verification', 'application', 'form', 'tier', 'stage', 'round', 'available', 'released', 'out', 'is', 'are',
+};
+
+/// A link that says only what is out ("DOWNLOAD PRELIMINARY EXAMINATION CALL
+/// LETTER"), not which exam: its section's heading says that.
+bool _bareLink(String text) => RegExp('[a-z]{3,}')
+    .allMatches(text.toLowerCase())
+    .every((m) => _bareWords.contains(m[0]) || _romanToken.hasMatch(m[0]!));
 
 /// Not about this exam's round after all: found by an older, looser watcher, or
 /// brought back by a backup from such a phone.

@@ -194,7 +194,7 @@ const List<CatalogExam> examCatalog = [
   CatalogExam('rrb-ntpc-ug', 'RRB NTPC (Under graduate)', _rrb,
       officialUrl: _rrbWeb, loginUrl: _rrbLogin,
       stages: ['CBT-1', 'CBT-2', 'Skill test', 'Document verification', 'Medical'],
-      aliases: ['ntpc under graduate', 'ntpc undergraduate', 'ntpc 12th']),
+      aliases: ['ntpc under graduate', 'ntpc undergraduate', 'ntpc 12th', 'ntpc 10+2', 'rrb ntpc ug', 'ntpc ug level']),
   CatalogExam('rrb-group-d', 'RRB Group D', _rrb,
       officialUrl: _rrbWeb, loginUrl: _rrbLogin, stages: ['CBT', 'PET', 'Document verification'],
       aliases: ['level-1', 'level 1 posts', 'rrc group d']),
@@ -299,7 +299,7 @@ String _norm(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9/&]+'), ' 
 final _year = RegExp(r'^(19|20)\d\d$');
 final _roman = RegExp(r'^(?=[ivxl]{2,}$)l?x{0,3}(ix|iv|v?i{0,3})$');
 final _cycleWords = {'crp', 'cycle', 'cen', 'advt', 'no'};
-const _postWords = {'scale', 'grade', 'group', 'tier', 'paper', 'class', 'phase'};
+const _postWords = {'scale', 'grade', 'group', 'tier', 'paper', 'class', 'phase', 'cbt', 'stage', 'part'};
 
 /// Splits what was typed into the words that name the exam and the ones that
 /// only say which round it is: a year ("2026") or an IBPS-style cycle numeral

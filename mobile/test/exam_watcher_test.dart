@@ -105,6 +105,7 @@ void main() {
       organization: ssc,
       source: UpdateSource.official,
       examSpecificPage: false,
+      boardsOwnPage: true, // ssc.gov.in: the board goes without saying
       knownUrls: const {},
     );
     expect([
