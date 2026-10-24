@@ -155,7 +155,10 @@ async def _ask(http: httpx.AsyncClient, titles: list[str], exam_list: str) -> li
                 continue
             raise
         content = response.json()["choices"][0]["message"]["content"]
-        labels = json.loads(content).get("labels")
+        if isinstance(content, list):  # some models answer in chunks
+            content = "".join(c.get("text", "") for c in content if isinstance(c, dict))
+        answer = json.loads(content)
+        labels = answer.get("labels") if isinstance(answer, dict) else answer
         return labels if isinstance(labels, list) else []
     return []
 
@@ -187,7 +190,7 @@ async def label_notices(
             batch = todo[start : start + BATCH]
             try:
                 answers = await _ask(http, [n["title"] for n in batch], exam_list)
-            except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError) as exc:
+            except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError, AttributeError) as exc:
                 log.warning("Mistral labels failed (%s); the rest wait for the next run", exc)
                 break
             requests += 1

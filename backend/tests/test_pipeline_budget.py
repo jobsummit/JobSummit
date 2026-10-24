@@ -45,6 +45,17 @@ def test_no_time_left_skips_the_phase():
     assert stopped == ["pdfs"]
 
 
+def test_a_crashing_phase_is_reported_and_the_run_goes_on():
+    async def breaks() -> int:
+        raise AttributeError("'list' object has no attribute 'get'")
+
+    stopped: list[str] = []
+    rp.ERRORS.clear()
+    assert asyncio.run(rp.timeboxed("labels", breaks(), 5, stopped)) == 0
+    assert stopped == ["labels"]
+    assert rp.ERRORS == ["labels: AttributeError: 'list' object has no attribute 'get'"]
+
+
 def test_budget_keeps_a_reserve_for_publishing():
     budget = rp.Budget(minutes=10)
     assert budget.left() <= 10 * 60 - rp.Budget.RESERVE_S

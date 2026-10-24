@@ -236,9 +236,15 @@ class Budget:
         return max(0.0, left if cap_s is None else min(left, cap_s))
 
 
+# Phases that crashed this run, with the error: published in the status file
+# (the Actions log needs a GitHub login to read).
+ERRORS: list[str] = []
+
+
 async def timeboxed(name: str, work: Awaitable[int], seconds: float, stopped: list[str]) -> int:
     """work's result, or 0 when it is still running after seconds (it is cancelled;
-    what it saved so far stays saved, the rest is picked up next run)."""
+    what it saved so far stays saved, the rest is picked up next run). A phase that
+    crashes is stopped the same way: the others still run and the files still go out."""
     if seconds <= 0:
         if asyncio.iscoroutine(work):
             work.close()
@@ -249,6 +255,11 @@ async def timeboxed(name: str, work: Awaitable[int], seconds: float, stopped: li
     except TimeoutError:
         log.warning("%s: out of time after %.0f s; the rest waits for the next run", name, seconds)
         stopped.append(name)
+        return 0
+    except Exception as exc:
+        log.exception("%s failed; the rest waits for the next run", name)
+        stopped.append(name)
+        ERRORS.append(f"{name}: {type(exc).__name__}: {exc}"[:300])
         return 0
 
 
@@ -357,6 +368,7 @@ async def run(
             stopped,
         )
         stats["stopped_early"] = stopped
+        stats["errors"] = ERRORS
     finally:
         await fetcher.aclose()
         await engine.dispose()
@@ -447,6 +459,7 @@ async def run_notices(
             stopped,
         )
         stats["stopped_early"] = stopped
+        stats["errors"] = ERRORS
     finally:
         await fetcher.aclose()
         await engine.dispose()

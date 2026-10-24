@@ -59,6 +59,19 @@ def test_labels_known_from_the_last_file_are_not_asked_again(monkeypatch):
     assert notices[2]["about"] == {"exam": "ibps-so", "stage": "mains"}
 
 
+def test_a_bare_list_or_chunked_answer_still_counts(monkeypatch):
+    monkeypatch.setattr(get_settings(), "mistral_api_key", SecretStr("test-key"))
+    label = [{"i": 0, "exam": "ssc-cgl", "stage": "tier-1"}]
+    for content in (json.dumps(label), [{"type": "text", "text": json.dumps({"labels": label})}]):
+        reply = {"choices": [{"message": {"content": content}}]}
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda r, reply=reply: httpx.Response(200, json=reply))
+        )
+        notices = _notices("SSC CGL Tier 1 Admit Card 2026")
+        assert asyncio.run(notice_labels.label_notices(notices, {}, client=client)) == 1
+        assert notices[0]["about"]["exam"] == "ssc-cgl"
+
+
 def test_without_a_key_notices_go_unlabelled(monkeypatch):
     monkeypatch.setattr(get_settings(), "mistral_api_key", SecretStr(""))
     notices = _notices("SSC CGL Tier 1 Admit Card 2026")
