@@ -128,8 +128,9 @@ jobs:
 
       # Practice tests' question bank (English, GK, science, computer, banking): a few
       # Mistral-written questions a run, kept only when a second model agrees on the
-      # answer, up to 1000 a section. Starts from the published files, so a failed
-      # run publishes them unchanged.
+      # answer, up to 1000 a section; and current affairs written from new PIB press
+      # releases (8 weeks kept). Starts from the published files, so a failed run
+      # publishes them unchanged.
       - name: Practice questions
         continue-on-error: true
         timeout-minutes: 9

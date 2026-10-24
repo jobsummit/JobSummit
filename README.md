@@ -1,35 +1,64 @@
 # JobSummit
 
-**One clear next step. Less to keep in mind.** A calm, ADHD-friendly Android app for
-Indian government and PSU jobs and exams.
+**Government jobs without the chaos.** A free, calm Android app for Indian government and PSU
+jobs: it shows only the jobs you can apply for, tracks every exam from form to result, and helps
+you practise for it. One clear next step at a time.
 
 **Download:** [latest release](https://github.com/jobsummit/JobSummit/releases/latest)
 (most phones: the `arm64-v8a` file) · [home page](https://jobsummit.github.io/JobSummit/) ·
 [privacy policy](https://jobsummit.github.io/JobSummit/privacy.html)
 
-| Folder | What | Status |
-|---|---|---|
-| [`backend/`](backend/README.md) | FastAPI + PostgreSQL + Gemini PDF extraction, Docker on OCI | Phases 1, 3, 4 |
-| [`mobile/`](mobile/README.md) | Flutter Android client, offline-first, calendar sync, self-updater | Phases 2 + 4 |
+## What it does
 
-**Test on your phone:** [`TESTING.md`](TESTING.md) · **Deploy:** [`backend/DEPLOY.md`](backend/DEPLOY.md) · **Release the app:** [`mobile/RELEASING.md`](mobile/RELEASING.md)
+**Jobs you are eligible for**
+- New SSC, railway, bank, UPSC, state PSC, defence, teaching and PSU notifications, read from the
+  official notices every few hours.
+- Only the posts that fit your age, category, qualification, subject and experience, with age
+  relaxation worked out and the seats open to your category.
+- Your fee, the last date and the official link for each job. Share a job from WhatsApp or
+  Telegram and the app finds it.
 
-**Phase 3 (backend)** added:
-- Google sign-in with rotating refresh tokens
-- A worker that crawls SarkariResult, FreeJobAlert, SSC, UPSC and IBPS every ~4 h
-- User-added career pages and public Telegram channels
-- Automatic hand-off of newly found notification PDFs to the Gemini extractor
+**Every exam, from form to result**
+- Watches the boards' notice pages for admit cards, exam dates, answer keys, results and
+  form-correction windows.
+- One quiet morning summary of forms closing soon; nothing rings at night.
+- Warns about two exams on one day, and adds dates to your calendar with reminders.
+- Scores your response sheet: paste its link and see your marks per section, with the exam's
+  own marking.
+- Keeps your registration and roll numbers and portal passwords, and makes your photo and
+  signature in each form's size.
+- Shows until which year your age lets you apply for each exam, and attempts left where they
+  are counted.
 
-**Phase 4** added:
-- Production Docker stack: nginx with Let's Encrypt, healthchecks, nightly backups with 7 days kept
-- FCM push engine
-- `/api/v1/app/version`
-- An in-app self-updater for GitHub builds
-- Signed `direct`/`store` build flavours and a tag-triggered GitHub Actions release
+**Practice that feels like the exam**
+- Timed tests in maths, reasoning, English, general awareness, current affairs, science,
+  computer and banking.
+- Full mocks in the pattern of SSC CGL, CHSL, MTS, GD, IBPS and SBI PO and Clerk, RRB NTPC,
+  Group D, ALP and more.
+- A Daily 10 (the same ten questions for everyone each day), every answer explained, and a
+  mistake notebook that brings wrong answers back after 1, 3 and 7 days.
 
-## Known gaps
+Made for people who find job hunting overwhelming, including people with ADHD: the most urgent
+thing first, XP and streaks for steps that move you forward, no ads, no tracking, no account
+needed (Google sign-in is optional, for a backup in your own Drive).
 
-- **Push needs the app side.** The server sends FCM pushes; the app still needs `firebase_messaging`
-  plus your Firebase `google-services.json`, and must register its token at `PUT /api/v1/devices`.
-  Application status already syncs to `PUT /api/v1/applications/{id}` when signed in.
-- **No migrations yet.** Move the database to Alembic before the next change to an existing table.
+## How it works
+
+There is no server. A data pipeline runs on GitHub Actions every two hours: it finds new
+notifications, reads their PDFs with AI, and publishes `jobs.json`, `notices.json` and the
+practice question bank to the `data` branch (served by GitHub Pages). The app downloads those
+files and does everything else on the phone: eligibility, the exam watcher, reminders, tests.
+
+Maths and reasoning questions are made on the phone, so their answers are right by
+construction. English, general awareness, science, computer and banking questions are written by
+one AI model and kept only when a second model, answering blind, agrees. Current affairs come
+from the text of official PIB press releases, each linked to its source.
+
+| Folder | What |
+|---|---|
+| [`mobile/`](mobile/README.md) | The Flutter Android app |
+| [`backend/`](backend/README.md) | The data pipeline (Python), run by `.github/workflows/data-pipeline.yml` and `notices.yml` |
+| [`site/`](site/) | The home page and privacy policy (GitHub Pages) |
+| [`branding/`](branding/) | App icon and store images |
+
+**Test on your phone:** [`TESTING.md`](TESTING.md) · **Release the app:** [`mobile/RELEASING.md`](mobile/RELEASING.md)
