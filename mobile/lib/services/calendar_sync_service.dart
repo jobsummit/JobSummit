@@ -169,45 +169,6 @@ class CalendarSyncService {
     return exams;
   }
 
-  /// A deadline event for a job not applied to yet: a 30-minute block ending at the
-  /// closing time, with a reminder every [every] (at most 5, Google's limit).
-  /// Returns `(calendarId, eventId)`, or null when it couldn't be written.
-  Future<(String, String)?> writeJobDeadline({
-    required String title,
-    required String description,
-    required DateTime deadline,
-    required DateTime now,
-    String? calendarId,
-    String? eventId,
-    Duration every = const Duration(hours: 4),
-  }) async {
-    final calendar = calendarId ?? (await findDefaultWritableCalendar())?.id;
-    if (calendar == null) return null;
-    final start = deadline.subtract(_deadlineBlock);
-    final reminders = <Reminder>[
-      for (var before = every; before <= const Duration(hours: 24); before += every)
-        if (deadline.subtract(before).isAfter(now) && before >= _deadlineBlock)
-          Reminder(minutes: (before - _deadlineBlock).inMinutes),
-    ];
-    if (deadline.subtract(const Duration(hours: 1)).isAfter(now)) {
-      reminders.add(Reminder(minutes: const Duration(hours: 1).inMinutes - _deadlineBlock.inMinutes));
-    }
-    reminders.sort((a, b) => (a.minutes ?? 0).compareTo(b.minutes ?? 0));
-    final event = Event(
-      calendar,
-      eventId: eventId,
-      title: title,
-      description: description,
-      start: tz.TZDateTime.from(start, _location),
-      end: tz.TZDateTime.from(deadline, _location),
-      reminders: reminders.take(5).toList(),
-    );
-    final result = await _plugin.createOrUpdateEvent(event);
-    final id = result?.data;
-    if (result == null || !result.isSuccess || id == null || id.isEmpty) return null;
-    return (calendar, id);
-  }
-
   Future<void> deleteEvent(String calendarId, String eventId) async {
     await _plugin.deleteEvent(calendarId, eventId);
   }

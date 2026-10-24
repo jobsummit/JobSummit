@@ -7,17 +7,18 @@ import '../domain/relevance.dart';
 import '../domain/urgency.dart';
 import '../models/feed.dart';
 import '../models/job_preferences.dart';
+import '../models/tracked_application.dart';
 import 'calendar_sync_service.dart';
 import 'database_service.dart';
 import 'jobs_repository.dart';
 import 'notification_service.dart';
 import 'profile_store.dart';
 
-/// Jobs that fit you and close within this window get last-day reminders.
-const kLastDayWindow = Duration(hours: 24);
+/// Jobs that fit you and close within this window go in the morning summary.
+const kSummaryWindow = Duration(hours: 48);
 
-/// A reminder notification at most this often per job (the background check runs ~every 15 min).
-const kNagEvery = Duration(hours: 4);
+/// The summary comes with the first check after this hour.
+const kSummaryHour = 7;
 
 /// The on/off switch (Settings → Alerts). On by default.
 abstract final class LastDayAlerts {
@@ -34,79 +35,62 @@ abstract final class LastDayAlerts {
   static Future<void> setEnabled(bool on) async => (await SharedPreferences.getInstance()).setBool(_key, on);
 }
 
-/// Last-day reminders for jobs you haven't applied to: a notification every few
-/// hours and a calendar event with a reminder every 4 hours. Applying, rejecting
-/// or hiding the job removes both; restoring it brings them back on the next sync.
+/// Jobs you haven't applied to that close soon: one silent summary each morning
+/// ("4 jobs close in the next 2 days"), which opens the Agenda. Applying, rejecting
+/// or hiding a job takes it out of the next one.
+///
+/// Until 0.18 each such job had its own notification every 4 hours and a calendar
+/// event: those are taken back on the first sync.
 class DeadlineReminders {
   DeadlineReminders(this._db, {CalendarSyncService? calendar}) : _calendar = calendar ?? CalendarSyncService(_db);
 
   final DatabaseService _db;
   final CalendarSyncService _calendar;
 
+  static const summaryKey = 'closing-summary';
+  static const _dayKey = 'alerts.summary.day';
+
   static String _notificationKey(String jobPostId) => 'deadline-$jobPostId';
 
   /// [jobs]: the open jobs you'd see in the app (already filtered and undecided).
-  /// Returns how many jobs have a reminder now.
+  /// Returns how many jobs close within [kSummaryWindow].
   Future<int> sync(List<FeedItem> jobs, {required DateTime now, bool? enabled, bool notify = true}) async {
+    for (final row in await _db.listJobReminders()) {
+      await _remove(row['job_post_id']! as String, row);
+    }
     final on = enabled ?? await LastDayAlerts.enabled();
-    final due = {
+    final due = [
       if (on)
         for (final j in jobs)
-          if (j.deadline.isAfter(now) && !j.deadline.isAfter(now.add(kLastDayWindow))) j.jobPostId: j,
-    };
-    final existing = {for (final r in await _db.listJobReminders()) r['job_post_id']! as String: r};
-
-    // Applied, rejected, hidden, closed or switched off: take it all back.
-    for (final MapEntry(key: id, value: row) in existing.entries) {
-      if (due.containsKey(id)) continue;
-      await _remove(id, row);
+          if (j.deadline.isAfter(now) && !j.deadline.isAfter(now.add(kSummaryWindow))) j,
+    ]..sort((a, b) => a.deadline.compareTo(b.deadline));
+    if (due.isEmpty) {
+      await _safe(() => NotificationService.cancel(summaryKey), null);
+      return 0;
     }
-
-    final calendarAllowed = due.isNotEmpty && await _safe(_calendar.hasPermission, false);
-    for (final job in due.values) {
-      final row = Map<String, Object?>.of(existing[job.jobPostId] ?? {'job_post_id': job.jobPostId});
-      row['deadline'] = job.deadline.millisecondsSinceEpoch;
-
-      final changedDeadline = existing[job.jobPostId]?['deadline'] != row['deadline'];
-      if (calendarAllowed && (row['event_id'] == null || changedDeadline)) {
-        final written = await _safe(
-          () => _calendar.writeJobDeadline(
-            title: '⏳ Apply: ${job.bestPost.postName} closes',
-            description: [
-              '${job.organization} · ${job.examName}',
-              if (job.applicationUrl != null) 'Apply online: ${job.applicationUrl}',
-              '\nAdded by JobSummit. Swipe the job left in the app to remove this.',
-            ].join('\n'),
-            deadline: job.deadline,
-            now: now,
-            calendarId: row['calendar_id'] as String?,
-            eventId: row['event_id'] as String?,
-          ),
-          null,
-        );
-        if (written != null) {
-          row['calendar_id'] = written.$1;
-          row['event_id'] = written.$2;
-        }
-      }
-
-      final last = row['notified_at'] as int?;
-      if (notify && (last == null || now.millisecondsSinceEpoch - last >= kNagEvery.inMilliseconds - 1800000)) {
-        await _safe(
-          () => NotificationService.show(
-            key: _notificationKey(job.jobPostId),
-            title: '⏳ ${countdownLabel(job.deadline, now)} to apply: ${job.bestPost.postName}',
-            body: '${job.organization} · closes ${formatDue(job.deadline)}. Tap to apply.',
-            url: job.applicationUrl,
-            deadline: true,
-          ),
-          null,
-        );
-        row['notified_at'] = now.millisecondsSinceEpoch;
-      }
-      await _db.saveJobReminder(row);
+    final prefs = await SharedPreferences.getInstance();
+    final today = '${now.year}-${now.month}-${now.day}';
+    if (notify && now.hour >= kSummaryHour && prefs.getString(_dayKey) != today) {
+      final (title, body) = summaryText(due, now);
+      await _safe(
+        () => NotificationService.show(
+            key: summaryKey, title: title, body: body, url: 'app:agenda', kind: Alert.summary, now: now),
+        null,
+      );
+      await prefs.setString(_dayKey, today);
     }
     return due.length;
+  }
+
+  /// "3 jobs close in the next 2 days" over the first few, soonest first.
+  static (String, String) summaryText(List<FeedItem> due, DateTime now) {
+    final n = due.length;
+    final title = n == 1 ? '1 job closes in the next 2 days' : '$n jobs close in the next 2 days';
+    final lines = [
+      for (final j in due.take(4)) '${j.bestPost.postName} · ${countdownLabel(j.deadline, now)} left',
+      if (n > 4) '+${n - 4} more',
+    ];
+    return (title, lines.join('\n'));
   }
 
   Future<void> _remove(String id, Map<String, Object?> row) async {
@@ -125,6 +109,52 @@ class DeadlineReminders {
     } catch (_) {
       return fallback; // no calendar / notifications on this phone: the rest still works
     }
+  }
+}
+
+/// A form you started but haven't paid for: one reminder once it closes within
+/// [window] ("the day before"). Paying, archiving or deleting it takes it back.
+abstract final class FormReminders {
+  static const window = Duration(hours: 30);
+  static const _prefix = 'alerts.form.';
+
+  static String _key(String appId) => 'form-$appId';
+
+  /// Returns the ids reminded this time.
+  static Future<List<String>> sync(Iterable<TrackedApplication> apps, {required DateTime now}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final reminded = <String>[];
+    final due = <String>{};
+    for (final app in apps) {
+      final deadline = app.deadline;
+      if (app.archived || !app.feeUnpaid || deadline == null) continue;
+      if (!deadline.isAfter(now) || deadline.isAfter(now.add(window))) continue;
+      due.add(app.id);
+      final stamp = '${deadline.millisecondsSinceEpoch}';
+      if (prefs.getString('$_prefix${app.id}') == stamp) continue; // already reminded for this date
+      try {
+        await NotificationService.show(
+          key: _key(app.id),
+          title: '⏳ Finish your form: ${app.examName}',
+          body: 'Fee not paid. Closes ${formatDue(deadline)}.',
+          url: app.loginUrl,
+          kind: Alert.form,
+          now: now,
+        );
+      } catch (_) {}
+      await prefs.setString('$_prefix${app.id}', stamp);
+      reminded.add(app.id);
+    }
+    // Paid, archived or gone: take the reminder back.
+    for (final k in prefs.getKeys().where((k) => k.startsWith(_prefix)).toList()) {
+      final id = k.substring(_prefix.length);
+      if (due.contains(id)) continue;
+      await prefs.remove(k);
+      try {
+        await NotificationService.cancel(_key(id));
+      } catch (_) {}
+    }
+    return reminded;
   }
 }
 

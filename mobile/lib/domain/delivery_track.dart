@@ -185,6 +185,8 @@ String _statusLabel(TrackedApplication app, List<TrackStop> stops, int active, D
       final date = stop.date;
       return date == null ? 'Result awaited' : 'Result expected ${_monthsLong[date.month - 1].substring(0, 3)}';
     default:
+      final due = app.deadline;
+      if (app.feeUnpaid) return due == null ? 'Not paid' : 'Not paid · closes ${stageDateLabel(due)}';
       return 'Applied';
   }
 }
@@ -231,6 +233,10 @@ String _headline(TrackedApplication app, List<TrackStop> stops, int active, Date
     case 4:
       return _cap('waiting for the ${p}result${date == null ? '' : ', expected around $when'}.');
     default:
+      if (app.feeUnpaid) {
+        final due = app.deadline;
+        return 'Form started. Pay the fee${due == null ? '' : ' by ${stageDateLabel(due)}'} to finish applying.';
+      }
       return 'Applied. We’re watching for the admit card, dates and results.';
   }
 }

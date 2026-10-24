@@ -4,7 +4,7 @@ import '../models/feed.dart';
 import '../models/tracked_application.dart';
 import 'urgency.dart';
 
-enum NextStepKind { apply, downloadAdmitCard, attendExam, prepareForExam }
+enum NextStepKind { apply, finishForm, downloadAdmitCard, attendExam, prepareForExam }
 
 @immutable
 class NextStep {
@@ -33,6 +33,7 @@ class NextStep {
   /// fees, corrections and admit cards live.
   String get actionLabel => switch (kind) {
         NextStepKind.apply => 'Apply online',
+        NextStepKind.finishForm => 'Finish & pay',
         NextStepKind.downloadAdmitCard => 'Download admit card',
         NextStepKind.attendExam || NextStepKind.prepareForExam => 'Application login',
       };
@@ -57,6 +58,18 @@ List<NextStep> computeNextSteps({
 
   for (final app in tracked) {
     if (app.archived) continue;
+    final due = app.deadline;
+    if (app.feeUnpaid && due != null && due.isAfter(now)) {
+      candidates.add(NextStep(
+        kind: NextStepKind.finishForm,
+        title: 'Finish your form: ${app.examName}',
+        due: due,
+        urgency: urgencyFor(due, now),
+        actionUrl: app.loginUrl,
+        application: app,
+      ));
+      continue;
+    }
     final exam = app.examAt;
     if (exam == null || !exam.isAfter(now)) continue;
 
@@ -66,7 +79,7 @@ List<NextStep> computeNextSteps({
           'Download admit card for ${app.examName}'
         ),
       ApplicationStatus.examScheduled => (NextStepKind.attendExam, 'Exam: ${app.examName}'),
-      ApplicationStatus.applied => (NextStepKind.prepareForExam, 'Prepare for ${app.examName}'),
+      ApplicationStatus.started || ApplicationStatus.applied => (NextStepKind.prepareForExam, 'Prepare for ${app.examName}'),
     };
     candidates.add(NextStep(
       kind: kind,
@@ -99,6 +112,7 @@ List<NextStep> computeNextSteps({
 }
 
 int _tiePriority(NextStepKind k) => switch (k) {
+      NextStepKind.finishForm => 0,
       NextStepKind.downloadAdmitCard => 0,
       NextStepKind.attendExam => 1,
       NextStepKind.apply => 2,

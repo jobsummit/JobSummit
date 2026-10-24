@@ -14,31 +14,15 @@ import 'package:timezone/data/latest.dart' as tzdata;
 
 final now = DateTime.utc(2026, 10, 14, 6);
 
-/// Records what would have gone into the phone's calendar.
+/// Records what was taken out of the phone's calendar.
 class FakeCalendar extends CalendarSyncService {
   FakeCalendar(super.db);
 
   final events = <String, DateTime>{}; // eventId -> deadline
   final deleted = <String>[];
-  var next = 0;
 
   @override
   Future<bool> hasPermission() async => true;
-
-  @override
-  Future<(String, String)?> writeJobDeadline({
-    required String title,
-    required String description,
-    required DateTime deadline,
-    required DateTime now,
-    String? calendarId,
-    String? eventId,
-    Duration every = const Duration(hours: 4),
-  }) async {
-    final id = eventId ?? 'e${next++}';
-    events[id] = deadline;
-    return ('cal', id);
-  }
 
   @override
   Future<void> deleteEvent(String calendarId, String eventId) async {
@@ -102,44 +86,44 @@ void main() {
     await dir.delete(recursive: true);
   });
 
-  test('only jobs closing within a day get a reminder; a reject removes it, a restore brings it back', () async {
-    final calendar = FakeCalendar(db);
-    final reminders = DeadlineReminders(db, calendar: calendar);
-    final open = jobs({'soon': const Duration(hours: 23), 'later': const Duration(days: 3)});
+  Future<String?> summaryDay() async => (await SharedPreferences.getInstance()).getString('alerts.summary.day');
 
-    expect(await reminders.sync(open, now: now), 1);
-    expect(calendar.events.values, [now.add(const Duration(hours: 23))]);
-    final row = (await db.listJobReminders()).single;
-    expect(row['job_post_id'], 'soon');
-    expect(row['notified_at'], now.millisecondsSinceEpoch);
+  test('jobs closing within 2 days go in one summary a day, after 7 AM', () async {
+    final reminders = DeadlineReminders(db, calendar: FakeCalendar(db));
+    final open = jobs({'soon': const Duration(hours: 23), 'next': const Duration(hours: 40), 'later': const Duration(days: 3)});
 
-    // Swiped left ("not for me"): it's no longer among the open jobs.
-    expect(await reminders.sync([for (final j in open) if (j.jobPostId != 'soon') j], now: now), 0);
-    expect(calendar.events, isEmpty);
-    expect(await db.listJobReminders(), isEmpty);
+    final early = DateTime(2026, 10, 14, 6);
+    expect(await reminders.sync(open, now: early), 2);
+    expect(await summaryDay(), isNull, reason: 'before 7 AM: not yet');
 
-    // Brought back from the Hidden list.
-    expect(await reminders.sync(open, now: now), 1);
-    expect(calendar.events, hasLength(1));
+    final morning = DateTime(2026, 10, 14, 7, 20);
+    await reminders.sync(open, now: morning);
+    expect(await summaryDay(), '2026-10-14');
+
+    // Swiped left ("not for me"): no longer counted.
+    expect(await reminders.sync([for (final j in open) if (j.jobPostId != 'soon') j], now: morning), 1);
   });
 
-  test('the notification repeats about every 4 hours; switching the reminders off removes everything', () async {
+  test('the summary reads as a short list, soonest first', () {
+    final open = jobs({'a': const Duration(hours: 5), 'b': const Duration(hours: 30)});
+    final (title, body) = DeadlineReminders.summaryText(open, now);
+    expect(title, '2 jobs close in the next 2 days');
+    expect(body.split('\n'), hasLength(2));
+    expect(body, startsWith('Officer a'));
+  });
+
+  test('the old per-job reminders and their calendar events are taken back', () async {
     final calendar = FakeCalendar(db);
-    final reminders = DeadlineReminders(db, calendar: calendar);
-    final open = jobs({'soon': const Duration(hours: 20)});
-
-    await reminders.sync(open, now: now);
-    final hourLater = now.add(const Duration(hours: 1));
-    await reminders.sync(open, now: hourLater);
-    expect((await db.listJobReminders()).single['notified_at'], now.millisecondsSinceEpoch); // not yet again
-
-    final fourLater = now.add(const Duration(hours: 4));
-    await reminders.sync(open, now: fourLater);
-    expect((await db.listJobReminders()).single['notified_at'], fourLater.millisecondsSinceEpoch);
-    expect(calendar.events, hasLength(1)); // the same event, not a new one each time
-
-    await reminders.sync(open, now: fourLater, enabled: false);
-    expect(calendar.events, isEmpty);
+    calendar.events['e0'] = now;
+    await db.saveJobReminder({
+      'job_post_id': 'soon',
+      'deadline': now.millisecondsSinceEpoch,
+      'calendar_id': 'cal',
+      'event_id': 'e0',
+      'notified_at': now.millisecondsSinceEpoch,
+    });
+    await DeadlineReminders(db, calendar: calendar).sync(jobs({'soon': const Duration(hours: 20)}), now: now);
+    expect(calendar.deleted, ['e0']);
     expect(await db.listJobReminders(), isEmpty);
   });
 }

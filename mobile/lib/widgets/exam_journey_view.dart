@@ -18,7 +18,7 @@ import 'pills.dart';
 
 enum _SyncState { idle, syncing, done }
 
-enum _MenuAction { admitCardLive, examScheduled, examDone, backToApplied, editLinks, delete }
+enum _MenuAction { admitCardLive, examScheduled, examDone, backToApplied, notPaid, editLinks, delete }
 
 /// The Exam journey page's content (one tracked exam): where it is now and the
 /// one next step, its delivery-style track, your IDs, Candidate login + Official
@@ -98,6 +98,8 @@ class _ExamJourneyViewState extends ConsumerState<ExamJourneyView> {
         await notifier.setStatus(app.id, ApplicationStatus.examScheduled, examAt: when);
       case _MenuAction.backToApplied:
         await notifier.setStatus(app.id, ApplicationStatus.applied);
+      case _MenuAction.notPaid:
+        await notifier.setStatus(app.id, ApplicationStatus.started);
       case _MenuAction.editLinks:
         final links = await showDialog<(String, String)>(
           context: context,
@@ -189,8 +191,12 @@ class _ExamJourneyViewState extends ConsumerState<ExamJourneyView> {
             const PopupMenuItem(value: _MenuAction.admitCardLive, child: Text('Admit card is out')),
           const PopupMenuItem(value: _MenuAction.examScheduled, child: Text('Set exam date')),
           if (!app.examOver(widget.now)) const PopupMenuItem(value: _MenuAction.examDone, child: Text('Exam is done')),
-          if (app.status != ApplicationStatus.applied)
-            const PopupMenuItem(value: _MenuAction.backToApplied, child: Text('Back to “Applied”')),
+          if (app.status == ApplicationStatus.started)
+            const PopupMenuItem(value: _MenuAction.backToApplied, child: Text('Fee is paid ✓'))
+          else if (app.status != ApplicationStatus.applied)
+            const PopupMenuItem(value: _MenuAction.backToApplied, child: Text('Back to “Applied”'))
+          else if (!app.examOver(widget.now))
+            const PopupMenuItem(value: _MenuAction.notPaid, child: Text('Fee not paid yet')),
           const PopupMenuItem(value: _MenuAction.editLinks, child: Text('Edit links')),
           const PopupMenuDivider(),
           PopupMenuItem(

@@ -9,6 +9,7 @@ import '../domain/urgency.dart';
 import '../models/feed.dart';
 import '../models/job_preferences.dart';
 import '../models/jobs_data.dart';
+import '../models/tracked_application.dart';
 import '../providers/jobs_providers.dart';
 import '../providers/providers.dart';
 import '../providers/xp_providers.dart';
@@ -55,7 +56,12 @@ Future<bool> applyToJob(BuildContext screenContext, WidgetRef ref, FeedItem item
       ),
     );
     unawaited(() async {
-      final creds = await showApplicationTrackerSheet(screenContext, title: 'Applied · ${app.postName}');
+      final creds = await showApplicationTrackerSheet(
+        screenContext,
+        title: 'Applied · ${app.postName}',
+        onPaidChanged: (paid) =>
+            notifier.setStatus(app.id, paid ? ApplicationStatus.applied : ApplicationStatus.started),
+      );
       if (creds != null) await notifier.saveCredentials(app.id, creds);
     }());
     return true;

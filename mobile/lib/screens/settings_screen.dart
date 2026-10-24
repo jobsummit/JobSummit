@@ -22,6 +22,7 @@ import '../services/auto_update.dart';
 import '../services/calendar_sync_service.dart';
 import '../services/deadline_reminders.dart';
 import '../services/fx.dart';
+import '../services/notification_service.dart';
 import '../services/update_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/system_actions.dart';
@@ -579,8 +580,9 @@ class _FxSwitchesState extends State<_FxSwitches> {
 
 List<Widget> _alertSections(BuildContext context) => [
       const _Section(
-        title: 'Last-day reminders',
-        children: [_LastDaySwitch()],
+        title: 'Reminders',
+        note: 'Your exams’ updates ring. Closing jobs come in one quiet morning summary.',
+        children: [_LastDaySwitch(), _QuietNightsSwitch()],
       ),
       const _Section(
         title: 'Calendar',
@@ -734,12 +736,10 @@ class _LastDaySwitchState extends ConsumerState<_LastDaySwitch> {
   Future<void> _set(bool on) async {
     setState(() => _on = on);
     await LastDayAlerts.setEnabled(on);
-    final db = ref.read(databaseProvider);
-    if (on) await CalendarSyncService(db).ensurePermission(); // asks once; notifications work without it
     final jobs = [for (final r in ref.read(rankedJobsProvider)) r.item];
-    await DeadlineReminders(db).sync(jobs, now: DateTime.now(), enabled: on);
+    await DeadlineReminders(ref.read(databaseProvider)).sync(jobs, now: DateTime.now(), enabled: on, notify: false);
     if (mounted) {
-      showCalmSnack(context, on ? 'Last-day reminders are on.' : 'Last-day reminders are off, and removed.');
+      showCalmSnack(context, on ? 'Morning summary is on.' : 'Morning summary is off.');
     }
   }
 
@@ -748,7 +748,39 @@ class _LastDaySwitchState extends ConsumerState<_LastDaySwitch> {
         contentPadding: EdgeInsets.zero,
         value: _on ?? true,
         onChanged: _on == null ? null : _set,
-        title: const Text('Remind me before jobs close'),
+        title: const Text('Morning summary of closing jobs'),
+      );
+}
+
+class _QuietNightsSwitch extends StatefulWidget {
+  const _QuietNightsSwitch();
+
+  @override
+  State<_QuietNightsSwitch> createState() => _QuietNightsSwitchState();
+}
+
+class _QuietNightsSwitchState extends State<_QuietNightsSwitch> {
+  bool? _on;
+
+  @override
+  void initState() {
+    super.initState();
+    QuietNights.enabled().then((v) {
+      if (mounted) setState(() => _on = v);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        value: _on ?? true,
+        onChanged: _on == null
+            ? null
+            : (on) async {
+                setState(() => _on = on);
+                await QuietNights.setEnabled(on);
+              },
+        title: const Text('Quiet at night (10 PM – 7 AM)'),
       );
 }
 

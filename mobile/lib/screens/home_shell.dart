@@ -206,6 +206,11 @@ class _AccountGateState extends ConsumerState<AccountGate> {
       }
     });
     ref.listenManual<List<RankedJob>>(rankedJobsProvider, (_, __) => _syncReminders());
+    // Paid, or marked not paid: its form reminder follows.
+    ref.listenManual(activeAppsProvider, (_, apps) {
+      unawaited(FormReminders.sync(apps, now: DateTime.now()).catchError((_) => const <String>[]));
+    });
+    NotificationService.openInApp.addListener(_openFromNotification);
     WidgetsBinding.instance.addPostFrameCallback((_) => _startup());
   }
 
@@ -214,7 +219,16 @@ class _AccountGateState extends ConsumerState<AccountGate> {
   @override
   void dispose() {
     _reminderDebounce?.cancel();
+    NotificationService.openInApp.removeListener(_openFromNotification);
     super.dispose();
+  }
+
+  /// The morning summary opens the Agenda (jobs by closing day).
+  void _openFromNotification() {
+    final place = NotificationService.openInApp.value;
+    if (place == null || !mounted) return;
+    NotificationService.openInApp.value = null;
+    if (place == 'agenda') ref.read(homeTabProvider.notifier).show(3);
   }
 
   /// A swipe, a restore or a new job list: update last-day reminders shortly after.

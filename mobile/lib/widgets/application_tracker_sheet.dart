@@ -5,25 +5,30 @@ import 'app_icons.dart';
 
 /// Application Tracker modal. Every field is optional: "Save" with nothing
 /// typed is a valid, zero-friction choice. Returns null if dismissed.
+/// [onPaidChanged]: shows a "Fee paid" switch (on) and reports each change at
+/// once, so it counts even if the sheet is closed without saving.
 Future<CredentialsInput?> showApplicationTrackerSheet(
   BuildContext context, {
   required String title,
   VaultEntry? initial,
   bool hasSavedPassword = false,
+  ValueChanged<bool>? onPaidChanged,
 }) =>
     showModalBottomSheet<CredentialsInput>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => _TrackerSheet(title: title, initial: initial, hasSavedPassword: hasSavedPassword),
+      builder: (_) => _TrackerSheet(
+          title: title, initial: initial, hasSavedPassword: hasSavedPassword, onPaidChanged: onPaidChanged),
     );
 
 class _TrackerSheet extends StatefulWidget {
-  const _TrackerSheet({required this.title, this.initial, this.hasSavedPassword = false});
+  const _TrackerSheet({required this.title, this.initial, this.hasSavedPassword = false, this.onPaidChanged});
 
   final String title;
   final VaultEntry? initial;
   final bool hasSavedPassword;
+  final ValueChanged<bool>? onPaidChanged;
 
   @override
   State<_TrackerSheet> createState() => _TrackerSheetState();
@@ -34,6 +39,7 @@ class _TrackerSheetState extends State<_TrackerSheet> {
   late final _roll = TextEditingController(text: widget.initial?.rollNumber);
   final _password = TextEditingController();
   bool _obscure = true;
+  bool _paid = true;
 
   @override
   void dispose() {
@@ -61,6 +67,17 @@ class _TrackerSheetState extends State<_TrackerSheet> {
             const SizedBox(height: 4),
             Text('Save what you have now. Everything here is optional and stays on this phone.',
                 style: text.bodySmall),
+            if (widget.onPaidChanged != null)
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _paid,
+                onChanged: (paid) {
+                  setState(() => _paid = paid);
+                  widget.onPaidChanged!(paid);
+                },
+                title: const Text('Fee paid'),
+                subtitle: _paid ? null : const Text('We’ll remind you the day before it closes'),
+              ),
             const SizedBox(height: 20),
             TextField(
               controller: _reg,

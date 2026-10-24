@@ -7,6 +7,8 @@ import 'exam_timeline.dart';
 import 'links.dart';
 
 enum ApplicationStatus {
+  /// Form started, fee not paid yet (an app before 0.18 reads it as applied).
+  started('started', 'Not paid'),
   applied('applied', 'Applied'),
   admitCardLive('admit_card_live', 'Admit card live'),
   examScheduled('exam_scheduled', 'Exam scheduled');
@@ -213,13 +215,17 @@ class TrackedApplication {
   /// The further of what the user set and what the watcher found.
   TrackerStatus get displayStatus {
     final local = switch (status) {
-      ApplicationStatus.applied => TrackerStatus.applied,
+      ApplicationStatus.started || ApplicationStatus.applied => TrackerStatus.applied,
       ApplicationStatus.admitCardLive => TrackerStatus.admitCardLive,
       ApplicationStatus.examScheduled => TrackerStatus.examScheduled,
     };
     final found = watcherStatus;
     return found != null && found.index > local.index ? found : local;
   }
+
+  /// The form is started but the fee isn't paid. An admit card or anything later
+  /// found for it means it was finished after all.
+  bool get feeUnpaid => status == ApplicationStatus.started && displayStatus == TrackerStatus.applied;
 
   /// Newest watcher notice of a kind ('admit_card', 'result', ...).
   ExamUpdate? latestUpdate(String milestone) {
@@ -252,7 +258,7 @@ class TrackedApplication {
       return now.isBefore(start) ? start : examEnd;
     }
     final due = deadline;
-    return status == ApplicationStatus.applied && due != null && due.isAfter(now) ? due : null;
+    return status.index <= ApplicationStatus.applied.index && due != null && due.isAfter(now) ? due : null;
   }
 
   /// Where you log in to pay, correct the form or download the admit card: the

@@ -45,7 +45,7 @@ Future<int> runWatchAndNotify(DatabaseService db, {bool force = false, Duration 
         count++;
         final (title, body) = notificationText(u.milestone, f.after.examName, u.title);
         await NotificationService.show(
-            key: '${f.after.id}-${u.milestone.wire}', title: title, body: body, url: u.open);
+            key: '${f.after.id}-${u.milestone.wire}', title: title, body: body, url: u.open, now: now);
       }
       if (f.after.calendarSynced && f.after.effectiveExamAt != f.before.effectiveExamAt) {
         try {
@@ -71,10 +71,14 @@ void watchCallbackDispatcher() {
     try {
       await runWatchAndNotify(db, force: true);
     } catch (_) {}
-    // Jobs that fit you and close within a day: notify again, keep the calendar right.
+    // Jobs that fit you and close soon: the morning summary.
     try {
       final now = DateTime.now();
       await DeadlineReminders(db).sync(await loadOpenJobs(db, now: now), now: now);
+    } catch (_) {}
+    // Forms started but not paid: a reminder the day before they close.
+    try {
+      await FormReminders.sync(await db.listApplications(), now: DateTime.now());
     } catch (_) {}
     // A new version: download it on Wi-Fi and, where Android allows, install it
     // without asking while the app isn't on screen.

@@ -70,7 +70,7 @@ List<StageView> computeLifecycle(TrackedApplication app, ExamTimeline? t, DateTi
   done[LifecycleStage.exam] =
       done[LifecycleStage.answerKey]! || t?.answerKeyUrl != null || _passed(examEnd, now);
   done[LifecycleStage.admitCard] = done[LifecycleStage.exam]!;
-  done[LifecycleStage.applied] = true; // tracked == applied
+  done[LifecycleStage.applied] = !app.feeUnpaid; // tracked == applied, unless the fee isn't paid
 
   final firstOpen = LifecycleStage.values.firstWhere((s) => !done[s]!, orElse: () => LifecycleStage.result);
   final allDone = LifecycleStage.values.every((s) => done[s]!);
@@ -87,14 +87,19 @@ List<StageView> computeLifecycle(TrackedApplication app, ExamTimeline? t, DateTi
   return [
     StageView(
       stage: LifecycleStage.applied,
-      state: StageState.completed,
+      state: app.feeUnpaid ? StageState.active : StageState.completed,
       date: t?.applicationEnd ?? app.deadline,
       details: [
         if (t?.feeDeadline != null && !_passed(t!.feeDeadline, now)) 'Pay the fee by ${_d(t.feeDeadline!)}',
         if (t?.editWindowStart != null && t?.editWindowEnd != null && !_passed(t!.editWindowEnd, now))
           'Correction window ${_d(t.editWindowStart!)} – ${_d(t.editWindowEnd!)}',
       ],
-      actions: [if (app.applicationUrl != null) StageAction('Application login', app.applicationUrl!)],
+      actions: [
+        if (app.feeUnpaid && app.loginUrl != null)
+          StageAction('Finish & pay', app.loginUrl!, primary: true)
+        else if (app.applicationUrl != null)
+          StageAction('Application login', app.applicationUrl!),
+      ],
     ),
     StageView(
       stage: LifecycleStage.admitCard,

@@ -144,6 +144,7 @@ String _stepTitle(NextStep s) => s.feedItem?.bestPost.postName ?? s.application?
 
 String _stepLine(NextStep s) => switch (s.kind) {
       NextStepKind.apply => '${s.feedItem?.organization ?? ''} · closes ${formatDue(s.due)}',
+      NextStepKind.finishForm => 'Fee not paid · closes ${formatDue(s.due)}',
       NextStepKind.downloadAdmitCard => 'Admit card is out · exam ${formatDue(s.due)}',
       NextStepKind.attendExam => 'Exam ${formatDue(s.due)}',
       NextStepKind.prepareForExam => 'Exam ${formatDue(s.due)}',
@@ -151,6 +152,7 @@ String _stepLine(NextStep s) => switch (s.kind) {
 
 String _stepLabel(NextStep s) => switch (s.kind) {
       NextStepKind.apply => 'NEXT DEADLINE',
+      NextStepKind.finishForm => 'FINISH YOUR FORM',
       NextStepKind.downloadAdmitCard => 'ADMIT CARD OUT',
       NextStepKind.attendExam || NextStepKind.prepareForExam => 'NEXT EXAM',
     };
