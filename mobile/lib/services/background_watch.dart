@@ -83,6 +83,7 @@ void watchCallbackDispatcher() {
       await FormReminders.sync(apps, now: DateTime.now());
       await CorrectionAlerts.sync(apps, now: DateTime.now());
       await ClashAlerts.sync(apps, now: DateTime.now());
+      await RefundAlerts.sync(apps, now: DateTime.now());
     } catch (_) {}
     // A new version: download it on Wi-Fi and, where Android allows, install it
     // without asking while the app isn't on screen.

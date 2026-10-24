@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../domain/exam_clash.dart';
 import '../domain/exam_watcher.dart';
 import '../domain/feed_builder.dart';
+import '../domain/fees.dart';
 import '../domain/relevance.dart';
 import '../domain/urgency.dart';
 import '../models/feed.dart';
@@ -221,6 +222,36 @@ abstract final class ClashAlerts {
         } catch (_) {}
         sent.add(pair);
       }
+    }
+    return sent;
+  }
+}
+
+/// Boards that give the fee back for attending (RRB): one reminder once the first
+/// exam is over, while claiming it still makes sense (60 days).
+abstract final class RefundAlerts {
+  static const _prefix = 'alerts.refund.';
+
+  static Future<List<String>> sync(Iterable<TrackedApplication> apps, {required DateTime now}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final sent = <String>[];
+    for (final app in apps) {
+      final rule = refundRule(app);
+      final end = app.examEnd;
+      if (rule == null || end == null || app.tier > 0 || app.notPaid || !app.examOver(now)) continue;
+      if (now.difference(end) > const Duration(days: 60)) continue;
+      if (prefs.getBool('$_prefix${app.id}') ?? false) continue;
+      await prefs.setBool('$_prefix${app.id}', true);
+      try {
+        await NotificationService.show(
+          key: 'refund-${app.id}',
+          title: '💸 Claim your fee refund: ${app.examName}',
+          body: '$rule Watch your login for the bank-details form.',
+          url: app.loginUrl,
+          now: now,
+        );
+      } catch (_) {}
+      sent.add(app.id);
     }
     return sent;
   }

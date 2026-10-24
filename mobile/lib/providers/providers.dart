@@ -2,6 +2,7 @@
 
 import '../domain/exam_clash.dart';
 import '../domain/exam_watcher.dart';
+import '../domain/fees.dart';
 import '../domain/feed_builder.dart';
 import '../domain/next_step.dart';
 import '../domain/tracked_duplicates.dart';
@@ -114,6 +115,8 @@ class TrackedAppsNotifier extends AsyncNotifier<List<TrackedApplication>> {
       createdAt: now,
       updatedAt: now,
       jobPostId: item.jobPostId,
+      // The fee for you, from the notification (you can change it on the exam's page).
+      feePaid: feeFor(item.job?.fees ?? const {}, ref.read(profileProvider).dataOrNull),
     );
     await _db.upsertApplication(app);
     await ref.read(decisionsProvider.notifier).record(item, applied: true); // learns what you like
@@ -123,9 +126,15 @@ class TrackedAppsNotifier extends AsyncNotifier<List<TrackedApplication>> {
     final timeline = item.timelineJson;
     // With the advert number: the exam watcher tells this recruitment from others.
     final advert = item.job?.advertisementNo;
+    final refund = item.job?.feeRefund;
     if (timeline != null) {
       await _db.saveTimeline(
-          item.jobPostId, jsonEncode({...timeline, if (advert != null) 'advertisement_no': advert}));
+          item.jobPostId,
+          jsonEncode({
+            ...timeline,
+            if (advert != null) 'advertisement_no': advert,
+            if (refund != null) 'fee_refund': refund,
+          }));
     }
     await reload();
     _changed();
@@ -340,6 +349,13 @@ class TrackedAppsNotifier extends AsyncNotifier<List<TrackedApplication>> {
     if (examAt != null) {
       unawaited(ref.read(xpProvider.notifier).award(XpAction.setExamDate, key: 'date:${_xpKey(id)}'));
     }
+  }
+
+  /// "Fee not paid yet" on or off; the fee you paid ([clearFee]: forget it).
+  Future<void> setFee(String id, {bool? notPaid, int? paid, bool clearFee = false}) async {
+    await _db.updateFee(id, notPaid: notPaid, paid: paid, clearFee: clearFee);
+    await reload();
+    _changed();
   }
 
   /// Optimistic so the Dismissible leaves the tree in the same frame.

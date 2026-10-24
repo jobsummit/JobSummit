@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/fees.dart';
 import '../domain/subjects.dart';
 import '../models/tracked_application.dart';
 import '../models/user_profile.dart';
@@ -146,6 +147,15 @@ class ProfileScreen extends ConsumerWidget {
                   ],
                 ),
               ),
+              if (feesPaidIn(apps, DateTime.now().year) case (total: final total, exams: final exams) when exams > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(
+                    'Fees paid in ${DateTime.now().year}: ${rupees(total)} for $exams exam${exams == 1 ? '' : 's'}',
+                    textAlign: TextAlign.center,
+                    style: text.bodySmall,
+                  ),
+                ),
               const SizedBox(height: 20),
               Text('BADGES', style: muted),
               const SizedBox(height: 10),

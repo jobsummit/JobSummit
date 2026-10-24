@@ -31,7 +31,7 @@ class DatabaseService {
   final Future<LocalCipher> Function() _cipher;
 
   static const _fileName = 'exam_tracker.db';
-  static const _version = 6;
+  static const _version = 7;
 
   /// [factory]/[path] are injectable so tests can use sqflite_common_ffi in memory.
   static Future<DatabaseService> open(
@@ -78,7 +78,9 @@ class DatabaseService {
           server_status      TEXT,
           updates_json       TEXT,
           tiers_json         TEXT,
-          tier               INTEGER NOT NULL DEFAULT 0
+          tier               INTEGER NOT NULL DEFAULT 0,
+          fee_unpaid         INTEGER NOT NULL DEFAULT 0,
+          fee_paid           INTEGER
         )''')
       ..execute(
           'CREATE INDEX ix_apps_active ON tracked_applications (archived, exam_timestamp, deadline_timestamp)')
@@ -138,6 +140,7 @@ class DatabaseService {
   /// v2: notification id, cached 5-stage timeline and exam-watcher state.
   /// v3: the application page ("Apply online" link).
   /// v6: the exam's stages (Tier-1, Tier-2…) and which one this entry tracks.
+  /// v7: "fee not paid yet", and the fee you paid.
   static Future<void> _onUpgrade(Database db, int from, int to) async {
     if (from < 2) {
       for (final column in ['job_post_id', 'timeline_json', 'server_id', 'server_status', 'updates_json']) {
@@ -160,6 +163,10 @@ class DatabaseService {
     if (from < 6) {
       await db.execute('ALTER TABLE tracked_applications ADD COLUMN tiers_json TEXT');
       await db.execute('ALTER TABLE tracked_applications ADD COLUMN tier INTEGER NOT NULL DEFAULT 0');
+    }
+    if (from < 7) {
+      await db.execute('ALTER TABLE tracked_applications ADD COLUMN fee_unpaid INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE tracked_applications ADD COLUMN fee_paid INTEGER');
     }
   }
 
@@ -194,6 +201,8 @@ class DatabaseService {
     'updates_json',
     'tiers_json',
     'tier',
+    'fee_unpaid',
+    'fee_paid',
   ];
   static const _vaultColumns = ['app_id', 'registration_id', 'roll_number', 'notes', 'updated_at'];
 
@@ -331,6 +340,18 @@ class DatabaseService {
           'status': status.wire,
           if (examAt != null) 'exam_timestamp': examAt.toUtc().millisecondsSinceEpoch,
           if (admitCardUrl != null) 'admit_card_url': admitCardUrl,
+          'updated_at': DateTime.now().toUtc().millisecondsSinceEpoch,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+  /// "Fee not paid yet" on or off, and/or the fee paid ([clearFee]: forget it).
+  Future<void> updateFee(String id, {bool? notPaid, int? paid, bool clearFee = false}) => _db.update(
+        'tracked_applications',
+        {
+          if (notPaid != null) 'fee_unpaid': notPaid ? 1 : 0,
+          if (paid != null || clearFee) 'fee_paid': clearFee ? null : paid,
           'updated_at': DateTime.now().toUtc().millisecondsSinceEpoch,
         },
         where: 'id = ?',

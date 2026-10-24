@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/exam_clash.dart';
+import '../domain/fees.dart';
 import '../domain/relevance.dart';
 import '../domain/xp.dart';
 import '../domain/urgency.dart';
 import '../models/feed.dart';
 import '../models/job_preferences.dart';
 import '../models/jobs_data.dart';
-import '../models/tracked_application.dart';
+import '../providers/account_providers.dart';
 import '../providers/jobs_providers.dart';
 import '../providers/providers.dart';
 import '../providers/xp_providers.dart';
@@ -60,8 +61,7 @@ Future<bool> applyToJob(BuildContext screenContext, WidgetRef ref, FeedItem item
       final creds = await showApplicationTrackerSheet(
         screenContext,
         title: 'Applied · ${app.postName}',
-        onPaidChanged: (paid) =>
-            notifier.setStatus(app.id, paid ? ApplicationStatus.applied : ApplicationStatus.started),
+        onPaidChanged: (paid) => notifier.setFee(app.id, notPaid: !paid),
       );
       if (creds != null) await notifier.saveCredentials(app.id, creds);
     }());
@@ -263,15 +263,17 @@ String employmentTypeLabel(String? type) => switch (type) {
 // -----------------------------------------------------------------------------
 
 /// Pay, seats, age, qualification and dates for the posts you qualify for.
-class JobDetails extends StatelessWidget {
+class JobDetails extends ConsumerWidget {
   const JobDetails({super.key, required this.item, this.category});
 
   final FeedItem item;
   final String? category;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final job = item.job;
+    final fees = job?.fees ?? const <String, int>{};
+    final yours = feeFor(fees, ref.watch(profileProvider).dataOrNull);
     final posts = postsOf(item);
     final timeline = job?.timelineJson ?? const <String, dynamic>{};
     final feeBy = DateTime.tryParse(timeline['fee_deadline'] as String? ?? '');
@@ -294,6 +296,15 @@ class JobDetails extends StatelessWidget {
                 if (job.examDate != null) 'Exam ${_day(job.examDate!)}',
               ].join('\n'),
             ),
+            if (fees.isNotEmpty)
+              _Row(
+                'Fee',
+                [
+                  if (yours != null) '${yours == 0 ? 'Free' : rupees(yours)} for you',
+                  feeTable(fees),
+                  if (job.feeRefund != null) job.feeRefund!,
+                ].join('\n'),
+              ),
           ],
           for (final post in posts) _PostDetails(post: post, category: category, showName: posts.length > 1),
         ],

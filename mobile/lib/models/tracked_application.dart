@@ -7,8 +7,6 @@ import 'exam_timeline.dart';
 import 'links.dart';
 
 enum ApplicationStatus {
-  /// Form started, fee not paid yet (an app before 0.18 reads it as applied).
-  started('started', 'Not paid'),
   applied('applied', 'Applied'),
   admitCardLive('admit_card_live', 'Admit card live'),
   examScheduled('exam_scheduled', 'Exam scheduled');
@@ -144,6 +142,8 @@ class TrackedApplication {
     this.updates = const [],
     this.tiers = const [],
     this.tier = 0,
+    this.notPaid = false,
+    this.feePaid,
   });
 
   /// Backend `post_detail_id` when tracked from the feed, so the feed can hide it.
@@ -193,6 +193,12 @@ class TrackedApplication {
   final List<String> tiers;
   final int tier;
 
+  /// "Fee not paid yet": the form is started, the fee isn't paid (see [feeUnpaid]).
+  final bool notPaid;
+
+  /// What you paid, in rupees, if you said.
+  final int? feePaid;
+
   /// The built-in exam this one is (stages, board website), when it is clear.
   CatalogExam? get catalogExam => matchCatalogExam('$examName $postName ${organization ?? ''}');
 
@@ -215,7 +221,7 @@ class TrackedApplication {
   /// The further of what the user set and what the watcher found.
   TrackerStatus get displayStatus {
     final local = switch (status) {
-      ApplicationStatus.started || ApplicationStatus.applied => TrackerStatus.applied,
+      ApplicationStatus.applied => TrackerStatus.applied,
       ApplicationStatus.admitCardLive => TrackerStatus.admitCardLive,
       ApplicationStatus.examScheduled => TrackerStatus.examScheduled,
     };
@@ -225,7 +231,7 @@ class TrackedApplication {
 
   /// The form is started but the fee isn't paid. An admit card or anything later
   /// found for it means it was finished after all.
-  bool get feeUnpaid => status == ApplicationStatus.started && displayStatus == TrackerStatus.applied;
+  bool get feeUnpaid => notPaid && status == ApplicationStatus.applied && displayStatus == TrackerStatus.applied;
 
   /// Newest watcher notice of a kind ('admit_card', 'result', ...).
   ExamUpdate? latestUpdate(String milestone) {
@@ -258,7 +264,7 @@ class TrackedApplication {
       return now.isBefore(start) ? start : examEnd;
     }
     final due = deadline;
-    return status.index <= ApplicationStatus.applied.index && due != null && due.isAfter(now) ? due : null;
+    return status == ApplicationStatus.applied && due != null && due.isAfter(now) ? due : null;
   }
 
   /// Where you log in to pay, correct the form or download the admit card: the
@@ -329,6 +335,8 @@ class TrackedApplication {
         'job_post_id': jobPostId,
         'tiers_json': tiers.isEmpty ? null : jsonEncode(tiers),
         'tier': tier,
+        'fee_unpaid': notPaid ? 1 : 0,
+        'fee_paid': feePaid,
         // timeline/server state is written separately (DatabaseService.saveTimeline,
         // saveWatcherState) so a local edit never overwrites it with a stale copy.
       };
@@ -360,6 +368,8 @@ class TrackedApplication {
         updates: _updates(r['updates_json']),
         tiers: _tiers(r['tiers_json']),
         tier: r['tier'] as int? ?? 0,
+        notPaid: r['fee_unpaid'] == 1,
+        feePaid: r['fee_paid'] as int?,
       );
 
   TrackedApplication copyWith({
@@ -395,5 +405,7 @@ class TrackedApplication {
         updates: updates,
         tiers: tiers,
         tier: tier,
+        notPaid: notPaid,
+        feePaid: feePaid,
       );
 }

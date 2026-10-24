@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/delivery_track.dart';
 import '../domain/exam_clash.dart';
+import '../domain/fees.dart';
 import '../domain/lifecycle.dart';
 import '../models/tracked_application.dart';
 import '../providers/providers.dart';
@@ -19,7 +20,7 @@ import 'pills.dart';
 
 enum _SyncState { idle, syncing, done }
 
-enum _MenuAction { admitCardLive, examScheduled, examDone, backToApplied, notPaid, editLinks, delete }
+enum _MenuAction { admitCardLive, examScheduled, examDone, backToApplied, notPaid, paid, feePaid, editLinks, delete }
 
 /// The Exam journey page's content (one tracked exam): where it is now and the
 /// one next step, its delivery-style track, your IDs, Candidate login + Official
@@ -100,7 +101,13 @@ class _ExamJourneyViewState extends ConsumerState<ExamJourneyView> {
       case _MenuAction.backToApplied:
         await notifier.setStatus(app.id, ApplicationStatus.applied);
       case _MenuAction.notPaid:
-        await notifier.setStatus(app.id, ApplicationStatus.started);
+        await notifier.setFee(app.id, notPaid: true);
+      case _MenuAction.paid:
+        await notifier.setFee(app.id, notPaid: false);
+      case _MenuAction.feePaid:
+        final amount = await showDialog<int?>(context: context, builder: (_) => _FeeDialog(initial: app.feePaid));
+        if (amount == null) return; // cancelled
+        await notifier.setFee(app.id, paid: amount < 0 ? null : amount, clearFee: amount < 0);
       case _MenuAction.editLinks:
         final links = await showDialog<(String, String)>(
           context: context,
@@ -192,12 +199,13 @@ class _ExamJourneyViewState extends ConsumerState<ExamJourneyView> {
             const PopupMenuItem(value: _MenuAction.admitCardLive, child: Text('Admit card is out')),
           const PopupMenuItem(value: _MenuAction.examScheduled, child: Text('Set exam date')),
           if (!app.examOver(widget.now)) const PopupMenuItem(value: _MenuAction.examDone, child: Text('Exam is done')),
-          if (app.status == ApplicationStatus.started)
-            const PopupMenuItem(value: _MenuAction.backToApplied, child: Text('Fee is paid ✓'))
-          else if (app.status != ApplicationStatus.applied)
+          if (app.status != ApplicationStatus.applied)
             const PopupMenuItem(value: _MenuAction.backToApplied, child: Text('Back to “Applied”'))
-          else if (!app.examOver(widget.now))
+          else if (app.feeUnpaid)
+            const PopupMenuItem(value: _MenuAction.paid, child: Text('Fee is paid ✓'))
+          else if (!app.examOver(widget.now) && app.displayStatus == TrackerStatus.applied)
             const PopupMenuItem(value: _MenuAction.notPaid, child: Text('Fee not paid yet')),
+          const PopupMenuItem(value: _MenuAction.feePaid, child: Text('Fee paid…')),
           const PopupMenuItem(value: _MenuAction.editLinks, child: Text('Edit links')),
           const PopupMenuDivider(),
           PopupMenuItem(
@@ -250,6 +258,16 @@ class _ExamJourneyViewState extends ConsumerState<ExamJourneyView> {
               for (final c in ref.watch(examClashesProvider)[app.id] ?? const <ExamClash>[]) ...[
                 const SizedBox(height: 10),
                 TonePill(label: '⚠️ ${c.label}', color: c.sure ? AppPalette.terracotta : AppPalette.honey),
+              ],
+              if (app.feePaid != null || refundRule(app) != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  [
+                    if (app.feePaid != null) 'Fee ${app.feePaid == 0 ? 'free' : rupees(app.feePaid!)}',
+                    if (refundRule(app) case final rule?) rule,
+                  ].join(' · '),
+                  style: text.bodySmall,
+                ),
               ],
               // What's happening now, and its button, sit under the tracker below.
               if ((app.totalSeats ?? 0) > 0) ...[
@@ -563,6 +581,48 @@ class _LinksDialogState extends State<_LinksDialog> {
             onPressed: () => Navigator.pop(context, (_url(_login), _url(_official))),
             child: const Text('Save'),
           ),
+        ],
+      );
+}
+
+/// "Fee paid…": the amount in rupees. Returns null when cancelled, -1 to forget it.
+class _FeeDialog extends StatefulWidget {
+  const _FeeDialog({this.initial});
+
+  final int? initial;
+
+  @override
+  State<_FeeDialog> createState() => _FeeDialogState();
+}
+
+class _FeeDialogState extends State<_FeeDialog> {
+  late final _amount = TextEditingController(text: widget.initial?.toString() ?? '');
+
+  @override
+  void dispose() {
+    _amount.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final raw = _amount.text.replaceAll(RegExp('[^0-9]'), '');
+    Navigator.pop(context, raw.isEmpty ? -1 : int.parse(raw));
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        backgroundColor: AppPalette.surface,
+        title: const Text('Fee paid'),
+        content: TextField(
+          controller: _amount,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          onSubmitted: (_) => _save(),
+          decoration: const InputDecoration(prefixText: '₹ ', hintText: 'e.g. 500'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(onPressed: _save, child: const Text('Save')),
         ],
       );
 }

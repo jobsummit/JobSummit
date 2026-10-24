@@ -79,7 +79,7 @@ List<NextStep> computeNextSteps({
           'Download admit card for ${app.examName}'
         ),
       ApplicationStatus.examScheduled => (NextStepKind.attendExam, 'Exam: ${app.examName}'),
-      ApplicationStatus.started || ApplicationStatus.applied => (NextStepKind.prepareForExam, 'Prepare for ${app.examName}'),
+      ApplicationStatus.applied => (NextStepKind.prepareForExam, 'Prepare for ${app.examName}'),
     };
     candidates.add(NextStep(
       kind: kind,

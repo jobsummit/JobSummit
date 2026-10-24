@@ -147,6 +147,8 @@ class PublishedJob {
     this.category = 'other',
     this.employmentType,
     this.sameAs = const [],
+    this.fees = const {},
+    this.feeRefund,
   });
 
   final String id;
@@ -177,6 +179,12 @@ class PublishedJob {
   /// applying to or turning down any of them counts for this job too.
   final List<String> sameAs;
 
+  /// Fee in rupees per category ("UR", "SC", "PWBD", "ALL"...), as the notification printed it.
+  final Map<String, int> fees;
+
+  /// The refund rule, if printed ("Rs 400 refunded on appearing in CBT-1").
+  final String? feeRefund;
+
   /// This job and the copies merged into it.
   Iterable<String> get ids => [id, ...sameAs];
 
@@ -194,6 +202,11 @@ class PublishedJob {
         category: j['category'] as String? ?? 'other',
         employmentType: j['employment_type'] as String?,
         sameAs: [for (final id in (j['same_as'] as List<dynamic>? ?? const [])) '$id'],
+        fees: {
+          for (final e in ((j['fees'] as Map<String, dynamic>?) ?? const {}).entries)
+            if (e.value is num) e.key: (e.value as num).toInt(),
+        },
+        feeRefund: j['fee_refund'] as String?,
         posts: [
           for (final p in (j['posts'] as List<dynamic>? ?? const []))
             PublishedPost.fromJson(p as Map<String, dynamic>),
