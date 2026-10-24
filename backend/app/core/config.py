@@ -43,8 +43,12 @@ class Settings(BaseSettings):
     mistral_models: str = "ministral-14b-latest,ministral-8b-latest,mistral-small-latest"
     mistral_timeout_s: int = 120
     # The practice question bank: the first model writes, a different one answers
-    # each question blind (only agreed ones are kept). Big models: facts matter here.
-    practice_models: str = "mistral-large-latest,mistral-medium-latest,mistral-small-latest"
+    # each question blind (only agreed ones are kept). Big models first: facts matter
+    # here; Ministral when the account can't use them.
+    practice_models: str = (
+        "mistral-large-latest,mistral-medium-latest,mistral-small-latest,"
+        "ministral-14b-latest,ministral-8b-latest"
+    )
 
     # --- Uploads ------------------------------------------------------------
     upload_dir: Path = Path("/data/notifications")
