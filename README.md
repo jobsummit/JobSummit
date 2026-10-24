@@ -40,14 +40,22 @@ you practise for it. One clear next step at a time.
 
 Made for people who find job hunting overwhelming, including people with ADHD: the most urgent
 thing first, XP and streaks for steps that move you forward, no ads, no tracking, no account
-needed (Google sign-in is optional, for a backup in your own Drive).
+needed (Google sign-in is optional, for a backup in your own Drive). People can choose to share,
+without their name, which jobs they apply to, so job picks get better for everyone.
 
 ## How it works
 
-There is no server. A data pipeline runs on GitHub Actions every two hours: it finds new
+There is no app server. A data pipeline runs on GitHub Actions every two hours: it finds new
 notifications, reads their PDFs with AI, and publishes `jobs.json`, `notices.json` and the
 practice question bank to the `data` branch (served by GitHub Pages). The app downloads those
 files and does everything else on the phone: eligibility, the exam watcher, reminders, tests.
+
+**Job picks.** People who opt in share their profile in bands (age range, category,
+qualification level, degrees), preferences, tracked exams and which jobs they applied to or turned
+down, keyed by a random id, never by name (`backend/supabase/insights.sql`). The pipeline's
+picks step has a small model (Ministral 8B) label each job's career track, and learns per-degree
+weights from the shared choices, publishing only groups of 5 or more people in `picks.json`. The
+phone adds those to its own learned likes at half weight.
 
 Maths and reasoning questions are made on the phone, so their answers are right by
 construction. English, general awareness, science, computer and banking questions are written by

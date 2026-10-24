@@ -191,10 +191,21 @@ as $$
   group by 1, 2 having count(distinct d.install_id) >= 5;
 $$;
 
-revoke all on function public.ingest(jsonb), public.forget(uuid), public.picks_training(), public.picks_jobs()
-  from public, anon, authenticated;
+-- Phones not seen for 12 months: their shared data goes (the pipeline calls this daily).
+create or replace function public.prune_old()
+returns bigint
+language sql
+security definer
+set search_path = ''
+as $$
+  with gone as (delete from insights.installs where last_seen < now() - interval '12 months' returning 1)
+  select count(*) from gone;
+$$;
+
+revoke all on function public.ingest(jsonb), public.forget(uuid), public.picks_training(), public.picks_jobs(),
+  public.prune_old() from public, anon, authenticated;
 grant execute on function public.ingest(jsonb), public.forget(uuid) to anon, authenticated;
-grant execute on function public.picks_training(), public.picks_jobs() to service_role;
+grant execute on function public.picks_training(), public.picks_jobs(), public.prune_old() to service_role;
 
 -- Admin views (Table Editor -> schema "insights"): the dashboard.
 create or replace view insights.daily_active as

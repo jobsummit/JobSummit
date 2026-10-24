@@ -54,6 +54,7 @@ def test_build_labels_new_jobs_and_learns_from_the_shared_choices(monkeypatch):
     monkeypatch.setattr(get_settings(), "mistral_api_key", SecretStr("test-key"))
     monkeypatch.setattr(get_settings(), "supabase_secret_key", SecretStr("sb_secret_test"))
     asked = []
+    pruned = []
 
     def answer(request: httpx.Request) -> httpx.Response:
         url = str(request.url)
@@ -61,6 +62,9 @@ def test_build_labels_new_jobs_and_learns_from_the_shared_choices(monkeypatch):
             assert request.headers["apikey"] == "sb_secret_test"
             return httpx.Response(200, json=[
                 {"cohort": "lvl:UG", "feature": "cat:ssc", "applied": 40, "rejected": 1, "people": 30}])  # fmt: skip
+        if "/rpc/prune_old" in url:
+            pruned.append(url)
+            return httpx.Response(200, json=0)
         if "/rpc/picks_jobs" in url:
             return httpx.Response(
                 200, json=[{"cohort": "deg:BSC", "job_id": "j1", "applied": 6, "rejected": 0}]
@@ -82,6 +86,7 @@ def test_build_labels_new_jobs_and_learns_from_the_shared_choices(monkeypatch):
     assert out["cohorts"]["lvl:UG"]["cat:ssc"] > 2
     assert out["cohorts"]["deg:BSC"]["track:officer"] > 0
     assert out["trained_at"]
+    assert len(pruned) == 1  # phones unseen for 12 months: deleted
 
 
 def test_without_the_secret_weights_stay(monkeypatch):

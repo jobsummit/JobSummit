@@ -181,6 +181,7 @@ async def build(
         tracks.update(await label_tracks(http, jobs, tracks, deadline))
         if _configured():
             try:
+                await _rpc(http, "prune_old")  # 12 months unseen: deleted
                 weights = cohort_weights(
                     await _rpc(http, "picks_training"), await _rpc(http, "picks_jobs"), tracks
                 )
