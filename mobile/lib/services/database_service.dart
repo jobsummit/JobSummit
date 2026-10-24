@@ -31,7 +31,7 @@ class DatabaseService {
   final Future<LocalCipher> Function() _cipher;
 
   static const _fileName = 'exam_tracker.db';
-  static const _version = 7;
+  static const _version = 8;
 
   /// [factory]/[path] are injectable so tests can use sqflite_common_ffi in memory.
   static Future<DatabaseService> open(
@@ -80,7 +80,8 @@ class DatabaseService {
           tiers_json         TEXT,
           tier               INTEGER NOT NULL DEFAULT 0,
           fee_unpaid         INTEGER NOT NULL DEFAULT 0,
-          fee_paid           INTEGER
+          fee_paid           INTEGER,
+          my_score           TEXT
         )''')
       ..execute(
           'CREATE INDEX ix_apps_active ON tracked_applications (archived, exam_timestamp, deadline_timestamp)')
@@ -168,6 +169,9 @@ class DatabaseService {
       await db.execute('ALTER TABLE tracked_applications ADD COLUMN fee_unpaid INTEGER NOT NULL DEFAULT 0');
       await db.execute('ALTER TABLE tracked_applications ADD COLUMN fee_paid INTEGER');
     }
+    if (from < 8) {
+      await db.execute('ALTER TABLE tracked_applications ADD COLUMN my_score TEXT');
+    }
   }
 
   Future<void> close() => _db.close();
@@ -203,6 +207,7 @@ class DatabaseService {
     'tier',
     'fee_unpaid',
     'fee_paid',
+    'my_score',
   ];
   static const _vaultColumns = ['app_id', 'registration_id', 'roll_number', 'notes', 'updated_at'];
 
@@ -354,6 +359,14 @@ class DatabaseService {
           if (paid != null || clearFee) 'fee_paid': clearFee ? null : paid,
           'updated_at': DateTime.now().toUtc().millisecondsSinceEpoch,
         },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+  /// Your marks from your response sheet ([score] null: forget them).
+  Future<void> updateScore(String id, String? score) => _db.update(
+        'tracked_applications',
+        {'my_score': score, 'updated_at': DateTime.now().toUtc().millisecondsSinceEpoch},
         where: 'id = ?',
         whereArgs: [id],
       );

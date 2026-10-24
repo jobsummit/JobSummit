@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/exam_catalog.dart';
+import '../domain/exam_limits.dart';
 import '../domain/fees.dart';
 import '../domain/practice.dart';
 import '../domain/subjects.dart';
 import '../models/tracked_application.dart';
 import '../models/user_profile.dart';
 import '../providers/account_providers.dart';
+import '../providers/limits_providers.dart';
 import '../providers/practice_providers.dart';
 import '../providers/providers.dart';
 import '../providers/xp_providers.dart';
@@ -183,6 +186,12 @@ class ProfileScreen extends ConsumerWidget {
                       _Tag(q, [AppPalette.periwinkle, AppPalette.sage, AppPalette.honey, AppPalette.lavender][i % 4]),
                   ],
                 ),
+              if (profile != null) ...[
+                const SizedBox(height: 20),
+                Text('HOW LONG YOU CAN APPLY', style: muted),
+                const SizedBox(height: 8),
+                const _AgeLimits(),
+              ],
               const SizedBox(height: 24),
               Row(
                 children: [
@@ -274,4 +283,58 @@ class _Tag extends StatelessWidget {
         child: Text(label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color, fontWeight: FontWeight.w800)),
       );
+}
+
+/// Each common exam's last year your age allows (with your relaxation), the
+/// soonest first: four, then all on request.
+class _AgeLimits extends ConsumerWidget {
+  const _AgeLimits();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final now = ref.watch(nowProvider);
+    final rows = <(CatalogExam, ExamLimits)>[
+      for (final e in examCatalog)
+        if (kUsualAgeRules.containsKey(e.id))
+          if (ref.watch(examLimitsProvider(e)) case final l?) (e, l),
+    ]..sort((a, b) => (a.$2.lastYear ?? 0).compareTo(b.$2.lastYear ?? 0));
+    final open = [for (final r in rows) if (r.$2.lastYear != null) r];
+    if (open.isEmpty) return const MutedNote('No common exam’s age limit fits you now.');
+    Widget tile((CatalogExam, ExamLimits) r) => ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: Text(r.$1.name),
+          subtitle: Text(r.$2.summary(now)),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final r in open.take(4)) tile(r),
+        TextButton(
+          onPressed: () => showModalBottomSheet<void>(
+            context: context,
+            useSafeArea: true,
+            isScrollControlled: true,
+            builder: (c) => DraggableScrollableSheet(
+              expand: false,
+              initialChildSize: 0.75,
+              builder: (c, scroll) => ListView(
+                controller: scroll,
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                children: [
+                  Text('How long you can apply', style: Theme.of(c).textTheme.titleLarge),
+                  const SizedBox(height: 4),
+                  Text('By your age and category, from each exam’s latest notice or its usual rule. '
+                      'The notice always decides.', style: Theme.of(c).textTheme.bodySmall),
+                  const SizedBox(height: 8),
+                  for (final r in rows) tile(r),
+                ],
+              ),
+            ),
+          ),
+          child: Text('See all ${rows.length} exams'),
+        ),
+      ],
+    );
+  }
 }

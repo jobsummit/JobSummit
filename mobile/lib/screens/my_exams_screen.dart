@@ -342,6 +342,11 @@ class ExamLaneCard extends ConsumerWidget {
           if (app.tierName != null) Text(app.tierName!, style: text.bodySmall),
           const SizedBox(height: 8),
           Text(track.headline, style: text.bodyMedium, maxLines: 3, overflow: TextOverflow.ellipsis),
+          if (app.myScore case final score?) ...[
+            const SizedBox(height: 6),
+            Text('Your score: ${score.label}',
+                style: text.labelLarge?.copyWith(color: AppPalette.periwinkle, fontWeight: FontWeight.w800)),
+          ],
           const SizedBox(height: 10),
           Row(
             children: [

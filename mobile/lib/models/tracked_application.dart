@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../domain/exam_catalog.dart';
+import '../domain/response_sheet.dart';
 import '../domain/upload_specs.dart';
 import 'exam_timeline.dart';
 import 'links.dart';
@@ -145,6 +146,7 @@ class TrackedApplication {
     this.tier = 0,
     this.notPaid = false,
     this.feePaid,
+    this.myScore,
   });
 
   /// Backend `post_detail_id` when tracked from the feed, so the feed can hide it.
@@ -199,6 +201,9 @@ class TrackedApplication {
 
   /// What you paid, in rupees, if you said.
   final int? feePaid;
+
+  /// Your marks, read from your response sheet.
+  final SheetScore? myScore;
 
   /// The built-in exam this one is (stages, board website), when it is clear.
   CatalogExam? get catalogExam => matchCatalogExam('$examName $postName ${organization ?? ''}');
@@ -341,6 +346,7 @@ class TrackedApplication {
         'tier': tier,
         'fee_unpaid': notPaid ? 1 : 0,
         'fee_paid': feePaid,
+        'my_score': myScore?.encode(),
         // timeline/server state is written separately (DatabaseService.saveTimeline,
         // saveWatcherState) so a local edit never overwrites it with a stale copy.
       };
@@ -374,6 +380,7 @@ class TrackedApplication {
         tier: r['tier'] as int? ?? 0,
         notPaid: r['fee_unpaid'] == 1,
         feePaid: r['fee_paid'] as int?,
+        myScore: SheetScore.decode(r['my_score']),
       );
 
   TrackedApplication copyWith({
@@ -411,5 +418,6 @@ class TrackedApplication {
         tier: tier,
         notPaid: notPaid,
         feePaid: feePaid,
+        myScore: myScore,
       );
 }

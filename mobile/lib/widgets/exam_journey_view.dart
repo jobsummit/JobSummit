@@ -16,6 +16,7 @@ import 'app_icons.dart';
 import 'credential_drawer.dart';
 import 'dashboard_check_sheet.dart';
 import 'exam_delivery_tracker.dart';
+import 'exam_prep_card.dart';
 import 'form_images_sheet.dart';
 import 'pills.dart';
 
@@ -30,6 +31,7 @@ enum _MenuAction {
   paid,
   feePaid,
   photos,
+  score,
   editLinks,
   delete
 }
@@ -119,6 +121,8 @@ class _ExamJourneyViewState extends ConsumerState<ExamJourneyView> {
       case _MenuAction.photos:
         await showFormImagesSheet(context,
             examName: app.examName, organization: app.organization, specs: app.uploadSpecs);
+      case _MenuAction.score:
+        await showScoreSheet(context, app);
       case _MenuAction.feePaid:
         final amount = await showDialog<int?>(context: context, builder: (_) => _FeeDialog(initial: app.feePaid));
         if (amount == null) return; // cancelled
@@ -222,6 +226,8 @@ class _ExamJourneyViewState extends ConsumerState<ExamJourneyView> {
             const PopupMenuItem(value: _MenuAction.notPaid, child: Text('Fee not paid yet')),
           const PopupMenuItem(value: _MenuAction.photos, child: Text('Photo & signature')),
           const PopupMenuItem(value: _MenuAction.feePaid, child: Text('Fee paid…')),
+          if (ExamPrepCard.sheetTime(app, widget.now))
+            const PopupMenuItem(value: _MenuAction.score, child: Text('Score my response sheet')),
           const PopupMenuItem(value: _MenuAction.editLinks, child: Text('Edit links')),
           const PopupMenuDivider(),
           PopupMenuItem(
@@ -302,6 +308,8 @@ class _ExamJourneyViewState extends ConsumerState<ExamJourneyView> {
         const SizedBox(height: 14),
         AppCard(child: ExamDeliveryTracker(app: app, now: widget.now, onTrackNextTier: _trackNextTier)),
         const SizedBox(height: 14),
+        // Its mock, your marks from the response sheet, your age / attempt limits.
+        ExamPrepCard(app: app, now: widget.now),
         AppCard(child: CredentialDrawer(app: app)),
         const SizedBox(height: 14),
         // Side by side when they fit, else one under the other: labels never break.

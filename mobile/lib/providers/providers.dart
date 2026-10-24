@@ -1,5 +1,6 @@
 
 
+import '../domain/response_sheet.dart';
 import '../domain/exam_clash.dart';
 import '../domain/exam_watcher.dart';
 import '../domain/fees.dart';
@@ -353,6 +354,12 @@ class TrackedAppsNotifier extends AsyncNotifier<List<TrackedApplication>> {
   }
 
   /// "Fee not paid yet" on or off; the fee you paid ([clearFee]: forget it).
+  Future<void> setScore(String id, SheetScore? score) async {
+    await _db.updateScore(id, score?.encode());
+    await reload();
+    _changed();
+  }
+
   Future<void> setFee(String id, {bool? notPaid, int? paid, bool clearFee = false}) async {
     await _db.updateFee(id, notPaid: notPaid, paid: paid, clearFee: clearFee);
     await reload();
