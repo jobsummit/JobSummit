@@ -122,6 +122,9 @@ class Affinity {
 
   static final empty = Affinity._(const {});
 
+  /// Weights learned elsewhere (the job-picks model, picks.dart).
+  factory Affinity.fromWeights(Map<String, double> weights) => Affinity._(Map.of(weights));
+
   final Map<String, double> _weights;
 
   bool get isEmpty => _weights.isEmpty;
@@ -252,7 +255,13 @@ class RankedJob {
   final List<String> reasons;
 }
 
-RankedJob rankJob(FeedItem item, JobPreferences prefs, Affinity affinity) {
+/// How much people like you count next to your own choices.
+const kCrowdShare = 0.5;
+
+/// [crowd]: what people with your degree lean towards (the job-picks model);
+/// [track]: the job's career track from the same model.
+RankedJob rankJob(FeedItem item, JobPreferences prefs, Affinity affinity,
+    {Affinity? crowd, String? track}) {
   final reasons = <String>[];
   var score = 0.0;
   final category = JobCategory.fromWire(item.category);
@@ -272,6 +281,13 @@ RankedJob rankJob(FeedItem item, JobPreferences prefs, Affinity affinity) {
     final features = jobFeatures(item);
     score += affinity.score(features);
     if (affinity.strongestLike(features) != null) reasons.add('Like jobs you applied to');
+  }
+  if (crowd != null && !crowd.isEmpty) {
+    final features = {...jobFeatures(item), if (track != null) 'track:$track'};
+    score += kCrowdShare * crowd.score(features);
+    if (crowd.strongestLike(features) != null && !reasons.contains('Like jobs you applied to')) {
+      reasons.add('Popular with people like you');
+    }
   }
   if (eligibilityUnknown(item)) {
     // Shown (you may well qualify), but below jobs that say who can apply.
@@ -316,10 +332,13 @@ List<RankedJob> rankJobs(
   Affinity affinity, {
   required String? myLevel,
   JobSort sort = JobSort.bestMatch,
+  Affinity? crowd,
+  Map<String, String> tracks = const {},
 }) {
   final ranked = [
     for (final item in items.map((i) => keepPostsYouMeet(i, prefs)))
-      if (hiddenBecause(item, prefs, myLevel: myLevel) == null) rankJob(item, prefs, affinity),
+      if (hiddenBecause(item, prefs, myLevel: myLevel) == null)
+        rankJob(item, prefs, affinity, crowd: crowd, track: tracks[item.jobPostId]),
   ];
   int byDeadline(RankedJob a, RankedJob b) => a.item.deadline.compareTo(b.item.deadline);
   ranked.sort(switch (sort) {

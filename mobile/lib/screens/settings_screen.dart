@@ -26,6 +26,7 @@ import '../services/notification_service.dart';
 import '../services/update_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/system_actions.dart';
+import '../widgets/insights_sheet.dart';
 import '../widgets/app_icons.dart';
 import '../widgets/common.dart';
 import '../widgets/one_line.dart';
@@ -347,6 +348,7 @@ class _JobsTab extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       children: [
         if (Env.privateJobsAvailable) const _PrivateJobsSwitch(),
+        const _Section(title: 'Job picks', children: [InsightsSettings()]),
         _Section(
           title: 'Show these first',
           children: [

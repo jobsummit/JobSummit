@@ -2,17 +2,21 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/env.dart';
 import '../domain/agenda.dart';
+import '../domain/insights.dart';
 import '../domain/relevance.dart';
 import '../domain/widget_summary.dart';
+import '../models/job_preferences.dart';
 import '../models/tracked_application.dart';
 import '../providers/account_providers.dart';
 import '../providers/agenda_providers.dart';
 import '../providers/backup_providers.dart';
+import '../providers/insights_providers.dart';
 import '../providers/jobs_providers.dart';
 import '../providers/practice_providers.dart';
 import '../providers/providers.dart';
@@ -20,10 +24,12 @@ import '../services/auth_service.dart';
 import '../services/deadline_reminders.dart';
 import '../services/notification_service.dart';
 import '../services/home_widget.dart';
+import '../services/insights_service.dart';
 import '../services/share_intake.dart';
 import '../theme/app_theme.dart';
 import '../utils/system_actions.dart';
 import '../widgets/app_icons.dart';
+import '../widgets/insights_sheet.dart';
 import '../widgets/motion.dart';
 import '../widgets/samsung_sleep_tip.dart';
 import '../widgets/shared_job_sheet.dart';
@@ -225,12 +231,60 @@ class _AccountGateState extends ConsumerState<AccountGate> {
     ref.listenManual(activeAppsProvider, (_, apps) {
       unawaited(FormReminders.sync(apps, now: DateTime.now()).catchError((_) => const <String>[]));
     });
+    // Shared choices ("Help improve job picks"): after a change, once things settle.
+    ref.listenManual(decisionsProvider, (_, __) => _shareSoon());
+    ref.listenManual(trackedAppsProvider, (_, __) => _shareSoon());
+    ref.listenManual(insightsConsentProvider, (_, __) => _shareSoon());
     NotificationService.openInApp.addListener(_openFromNotification);
     ShareIntake.incoming.addListener(_openShared);
     WidgetsBinding.instance.addPostFrameCallback((_) => _startup());
   }
 
   Timer? _reminderDebounce;
+  Timer? _shareDebounce;
+
+  void _shareSoon() {
+    _shareDebounce?.cancel();
+    _shareDebounce = Timer(const Duration(seconds: 20), () => unawaited(_share()));
+  }
+
+  /// Only with a yes; the service sends at most once an hour, and once a day
+  /// when nothing changed.
+  Future<void> _share() async {
+    try {
+      final profile = ref.read(profileProvider).dataOrNull;
+      if (!mounted || profile == null || !profile.isComplete) return;
+      if (await InsightsService.consent() != true) return;
+      var version = '';
+      try {
+        version = (await PackageInfo.fromPlatform()).version;
+      } catch (_) {}
+      final payload = insightsPayload(
+        installId: await InsightsService.installId(),
+        appVersion: version,
+        profile: profile,
+        preferences: ref.read(jobPreferencesProvider).dataOrNull ?? JobPreferences.defaults,
+        exams: ref.read(trackedAppsProvider).dataOrNull ?? const [],
+        decisions: [
+          for (final d in ref.read(decisionsProvider).dataOrNull ?? const <JobDecision>[])
+            (jobId: d.jobPostId, applied: d.applied, features: d.features, at: d.decidedAt),
+        ],
+        now: DateTime.now(),
+      );
+      await ref.read(insightsServiceProvider).maybeUpload(payload);
+    } catch (_) {
+      // Sharing is a bonus: never in the way.
+    }
+  }
+
+  /// Once, after the profile is done.
+  Future<void> _askInsightsOnce() async {
+    try {
+      final profile = ref.read(profileProvider).dataOrNull;
+      if (profile == null || !profile.isComplete || await InsightsService.consent() != null || !mounted) return;
+      await showInsightsSheet(context);
+    } catch (_) {}
+  }
 
   void _writeWidget() {
     final practice = ref.read(practiceHistoryProvider).valueOrNull ?? const [];
@@ -241,6 +295,7 @@ class _AccountGateState extends ConsumerState<AccountGate> {
   @override
   void dispose() {
     _reminderDebounce?.cancel();
+    _shareDebounce?.cancel();
     NotificationService.openInApp.removeListener(_openFromNotification);
     ShareIntake.incoming.removeListener(_openShared);
     super.dispose();
@@ -283,6 +338,8 @@ class _AccountGateState extends ConsumerState<AccountGate> {
     if (ref.read(accountStatusProvider) == AccountStatus.needsProfile) _promptProfile();
     await _askNotificationsOnce();
     await _samsungTipOnce();
+    await _askInsightsOnce();
+    _shareSoon();
     unawaited(NotificationService.openLaunchLink()); // a notification tap opened the app
     unawaited(ShareIntake.init().then((_) => _openShared())); // a shared job opened the app
     unawaited(ref.read(trackedAppsProvider.notifier).checkForUpdates()); // throttled

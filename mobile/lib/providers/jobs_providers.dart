@@ -1,3 +1,4 @@
+import 'insights_providers.dart';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -185,6 +186,8 @@ final rankedJobsProvider = Provider<List<RankedJob>>((ref) => rankJobs(
       ref.watch(effectiveJobPreferencesProvider),
       ref.watch(affinityProvider),
       myLevel: _myLevel(ref),
+      crowd: ref.watch(crowdAffinityProvider),
+      tracks: ref.watch(picksProvider).dataOrNull?.tracks ?? const {},
     ));
 
 final rankedNearMissProvider = Provider<List<RankedJob>>((ref) => rankJobs(
@@ -192,6 +195,8 @@ final rankedNearMissProvider = Provider<List<RankedJob>>((ref) => rankJobs(
       ref.watch(effectiveJobPreferencesProvider),
       ref.watch(affinityProvider),
       myLevel: _myLevel(ref),
+      crowd: ref.watch(crowdAffinityProvider),
+      tracks: ref.watch(picksProvider).dataOrNull?.tracks ?? const {},
     ));
 
 /// Open jobs your preferences hide, each with why (listed so nothing feels lost).

@@ -61,7 +61,15 @@ abstract final class Env {
   static const reviewTextEntry = 'entry.907586785';
   static const reviewEmailEntry = 'entry.2080412853';
 
-  static const privateJobsAvailable = bool.fromEnvironment('ENABLE_PRIVATE_JOBS', defaultValue: true);
+  /// "Help improve job picks" (opt-in): the Supabase project phones share with.
+  /// The publishable key is meant to be public: it can only call ingest() and
+  /// forget() (backend/supabase/insights.sql), never read anything.
+  static const supabaseUrl =
+      String.fromEnvironment('SUPABASE_URL', defaultValue: 'https://mowurjbmifkwlaogidns.supabase.co');
+  static const supabaseKey =
+      String.fromEnvironment('SUPABASE_KEY', defaultValue: 'sb_publishable_TOsXmJkb6qn3zI2_B3ZIdg_3Z2LQLyq');
+
+  static const privateJobsAvailable =bool.fromEnvironment('ENABLE_PRIVATE_JOBS', defaultValue: true);
 
   /// Calendar events are written in this zone. The audience is India-only, so
   /// a fixed zone avoids a native timezone-lookup dependency.
