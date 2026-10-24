@@ -20,10 +20,10 @@ final crowdAffinityProvider = Provider<Affinity>((ref) {
 
 final insightsServiceProvider = Provider<InsightsService>((ref) => InsightsService());
 
-/// "Help improve job picks": null until asked.
-class InsightsConsentNotifier extends AsyncNotifier<bool?> {
+/// "Help improve job picks": on unless turned off.
+class InsightsConsentNotifier extends AsyncNotifier<bool> {
   @override
-  Future<bool?> build() => InsightsService.consent();
+  Future<bool> build() => InsightsService.consent();
 
   Future<void> set(bool yes) async {
     await InsightsService.setConsent(yes);
@@ -38,4 +38,4 @@ class InsightsConsentNotifier extends AsyncNotifier<bool?> {
 }
 
 final insightsConsentProvider =
-    AsyncNotifierProvider<InsightsConsentNotifier, bool?>(InsightsConsentNotifier.new);
+    AsyncNotifierProvider<InsightsConsentNotifier, bool>(InsightsConsentNotifier.new);

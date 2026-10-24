@@ -40,8 +40,9 @@ you practise for it. One clear next step at a time.
 
 Made for people who find job hunting overwhelming, including people with ADHD: the most urgent
 thing first, XP and streaks for steps that move you forward, no ads, no tracking, no account
-needed (Google sign-in is optional, for a backup in your own Drive). People can choose to share,
-without their name, which jobs they apply to, so job picks get better for everyone.
+needed (Google sign-in is optional, for a backup in your own Drive). To make job picks better for
+everyone, the app shares without names which jobs people apply to (on by default; one switch in
+Settings turns it off and another deletes what was shared).
 
 ## How it works
 
@@ -50,7 +51,7 @@ notifications, reads their PDFs with AI, and publishes `jobs.json`, `notices.jso
 practice question bank to the `data` branch (served by GitHub Pages). The app downloads those
 files and does everything else on the phone: eligibility, the exam watcher, reminders, tests.
 
-**Job picks.** People who opt in share their profile in bands (age range, category,
+**Job picks.** Unless they turn it off, phones share their profile in bands (age range, category,
 qualification level, degrees), preferences, tracked exams and which jobs they applied to or turned
 down, keyed by a random id, never by name (`backend/supabase/insights.sql`). The pipeline's
 picks step has a small model (Ministral 8B) label each job's career track, and learns per-degree

@@ -79,14 +79,14 @@ void main() {
       );
     });
 
-    test('nothing without a yes', () async {
-      expect(await service.maybeUpload(payload()), isFalse);
+    test('on unless turned off; nothing once it is off', () async {
+      expect(await InsightsService.consent(), isTrue);
       await InsightsService.setConsent(false);
       expect(await service.maybeUpload(payload()), isFalse);
       expect(sent, isEmpty);
     });
 
-    test('with a yes: sent, then not again unless it changed or a day passed', () async {
+    test('sent, then not again unless it changed or a day passed', () async {
       await InsightsService.setConsent(true);
       final now = DateTime(2026, 10, 24, 9);
       expect(await service.maybeUpload(payload(), now: now), isTrue);

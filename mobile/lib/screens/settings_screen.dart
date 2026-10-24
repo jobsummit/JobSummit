@@ -26,7 +26,7 @@ import '../services/notification_service.dart';
 import '../services/update_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/system_actions.dart';
-import '../widgets/insights_sheet.dart';
+import '../widgets/insights_settings.dart';
 import '../widgets/app_icons.dart';
 import '../widgets/common.dart';
 import '../widgets/one_line.dart';

@@ -6,8 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/env.dart';
 
-/// "Help improve job picks": your yes or no, this phone's random id, and the
-/// once-a-day upload (only when something changed). Never sent without a yes.
+/// "Help improve job picks": on unless you turn it off (Settings › Jobs), this
+/// phone's random id, and the once-a-day upload (only when something changed).
 class InsightsService {
   InsightsService({http.Client? client, String? url, String? key})
       : _client = client ?? http.Client(),
@@ -25,8 +25,8 @@ class InsightsService {
 
   static const every = Duration(hours: 24);
 
-  /// null: not asked yet.
-  static Future<bool?> consent() async => (await SharedPreferences.getInstance()).getBool(_kConsent);
+  /// On unless turned off (a "No thanks" given in 0.21.0 stays off).
+  static Future<bool> consent() async => (await SharedPreferences.getInstance()).getBool(_kConsent) ?? true;
 
   static Future<void> setConsent(bool yes) async => (await SharedPreferences.getInstance()).setBool(_kConsent, yes);
 
@@ -50,10 +50,10 @@ class InsightsService {
 
   Map<String, String> get _headers => {'apikey': _key, 'Content-Type': 'application/json'};
 
-  /// Sends [payload] when you said yes, it changed since the last time or a day
+  /// Sends [payload] while sharing is on, it changed since the last time or a day
   /// has passed, and not within the hour. True when it was sent.
   Future<bool> maybeUpload(Map<String, Object?> payload, {DateTime? now}) async {
-    if (await consent() != true) return false;
+    if (!await consent()) return false;
     final prefs = await SharedPreferences.getInstance();
     final at = now ?? DateTime.now();
     final last = DateTime.tryParse(prefs.getString(_kLast) ?? '');

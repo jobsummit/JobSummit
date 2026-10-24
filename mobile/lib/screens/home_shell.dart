@@ -29,7 +29,6 @@ import '../services/share_intake.dart';
 import '../theme/app_theme.dart';
 import '../utils/system_actions.dart';
 import '../widgets/app_icons.dart';
-import '../widgets/insights_sheet.dart';
 import '../widgets/motion.dart';
 import '../widgets/samsung_sleep_tip.dart';
 import '../widgets/shared_job_sheet.dart';
@@ -248,13 +247,13 @@ class _AccountGateState extends ConsumerState<AccountGate> {
     _shareDebounce = Timer(const Duration(seconds: 20), () => unawaited(_share()));
   }
 
-  /// Only with a yes; the service sends at most once an hour, and once a day
+  /// Only while sharing is on; the service sends at most once an hour, and once a day
   /// when nothing changed.
   Future<void> _share() async {
     try {
       final profile = ref.read(profileProvider).dataOrNull;
       if (!mounted || profile == null || !profile.isComplete) return;
-      if (await InsightsService.consent() != true) return;
+      if (!await InsightsService.consent()) return;
       var version = '';
       try {
         version = (await PackageInfo.fromPlatform()).version;
@@ -275,15 +274,6 @@ class _AccountGateState extends ConsumerState<AccountGate> {
     } catch (_) {
       // Sharing is a bonus: never in the way.
     }
-  }
-
-  /// Once, after the profile is done.
-  Future<void> _askInsightsOnce() async {
-    try {
-      final profile = ref.read(profileProvider).dataOrNull;
-      if (profile == null || !profile.isComplete || await InsightsService.consent() != null || !mounted) return;
-      await showInsightsSheet(context);
-    } catch (_) {}
   }
 
   void _writeWidget() {
@@ -338,7 +328,6 @@ class _AccountGateState extends ConsumerState<AccountGate> {
     if (ref.read(accountStatusProvider) == AccountStatus.needsProfile) _promptProfile();
     await _askNotificationsOnce();
     await _samsungTipOnce();
-    await _askInsightsOnce();
     _shareSoon();
     unawaited(NotificationService.openLaunchLink()); // a notification tap opened the app
     unawaited(ShareIntake.init().then((_) => _openShared())); // a shared job opened the app
