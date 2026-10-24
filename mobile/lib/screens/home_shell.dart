@@ -14,6 +14,7 @@ import '../providers/account_providers.dart';
 import '../providers/agenda_providers.dart';
 import '../providers/backup_providers.dart';
 import '../providers/jobs_providers.dart';
+import '../providers/practice_providers.dart';
 import '../providers/providers.dart';
 import '../services/auth_service.dart';
 import '../services/deadline_reminders.dart';
@@ -218,9 +219,8 @@ class _AccountGateState extends ConsumerState<AccountGate> {
     });
     ref.listenManual<List<RankedJob>>(rankedJobsProvider, (_, __) => _syncReminders());
     // The home-screen widget follows the Agenda (unchanged text isn't written again).
-    ref.listenManual(agendaProvider, fireImmediately: true, (_, items) {
-      unawaited(HomeWidget.write(widgetSummary(items, DateTime.now())).catchError((_) {}));
-    });
+    ref.listenManual(agendaProvider, fireImmediately: true, (_, __) => _writeWidget());
+    ref.listenManual(practiceHistoryProvider, (_, __) => _writeWidget()); // the Daily 10 line
     // Paid, or marked not paid: its form reminder follows.
     ref.listenManual(activeAppsProvider, (_, apps) {
       unawaited(FormReminders.sync(apps, now: DateTime.now()).catchError((_) => const <String>[]));
@@ -231,6 +231,12 @@ class _AccountGateState extends ConsumerState<AccountGate> {
   }
 
   Timer? _reminderDebounce;
+
+  void _writeWidget() {
+    final practice = ref.read(practiceHistoryProvider).valueOrNull ?? const [];
+    unawaited(HomeWidget.write(widgetSummary(ref.read(agendaProvider), DateTime.now(), practice: practice))
+        .catchError((_) {}));
+  }
 
   @override
   void dispose() {

@@ -2,7 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../config/env.dart';
+
+import '../domain/mistakes.dart';
 import '../domain/practice.dart';
 import '../domain/xp.dart';
 import '../providers/practice_providers.dart';
@@ -57,7 +61,8 @@ class _PracticeTestScreenState extends ConsumerState<PracticeTestScreen> {
   }
 
   Future<void> _load() async {
-    final qs = await buildPracticeTest(ref.read(practiceBankProvider), plan);
+    final mistakes = plan.planKind == PlanKind.review ? await ref.read(mistakesProvider.future) : const <MistakeCard>[];
+    final qs = await buildPracticeTest(ref.read(practiceBankProvider), plan, mistakes: mistakes);
     if (!mounted) return;
     setState(() {
       _questions = qs;
@@ -96,6 +101,7 @@ class _PracticeTestScreenState extends ConsumerState<PracticeTestScreen> {
     final result = grade(plan, qs, _chosen, at: DateTime.now(), seconds: used.inSeconds);
     setState(() => _result = result);
     await ref.read(practiceHistoryProvider.notifier).add(result);
+    await ref.read(mistakesProvider.notifier).record(qs, _chosen, review: plan.planKind == PlanKind.review);
     Fx.done();
     if (result.counts) await ref.read(xpProvider.notifier).award(XpAction.practiced);
     if (result.share >= 0.8 && mounted) showConfetti(context);
@@ -206,7 +212,7 @@ class _PracticeTestScreenState extends ConsumerState<PracticeTestScreen> {
         ),
         body: switch ((qs, _result)) {
           (null, _) => const Center(child: CircularProgressIndicator()),
-          (final List<PracticeQuestion> list, _) when list.isEmpty => const _NoQuestions(),
+          (final List<PracticeQuestion> list, _) when list.isEmpty => _NoQuestions(review: plan.planKind == PlanKind.review),
           (final List<PracticeQuestion> list, final PracticeResult r?) => _ResultView(
               plan: plan,
               result: r,
@@ -245,7 +251,7 @@ class _PracticeTestScreenState extends ConsumerState<PracticeTestScreen> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             children: [
               Text(
-                plan.isMock ? '${q.section.short} · ${q.topic}' : q.topic,
+                plan.isMixed ? '${q.section.short} · ${q.topic}' : q.topic,
                 style: text.labelMedium?.copyWith(color: AppPalette.textMuted, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 8),
@@ -418,13 +424,17 @@ class _PaletteDot extends StatelessWidget {
 }
 
 class _NoQuestions extends StatelessWidget {
-  const _NoQuestions();
+  const _NoQuestions({required this.review});
+
+  final bool review;
 
   @override
-  Widget build(BuildContext context) => const Padding(
-        padding: EdgeInsets.all(24),
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.all(24),
         child: Center(
-          child: MutedNote('No questions for this section on the phone yet. Connect to the internet once and try again.'),
+          child: MutedNote(review
+              ? 'Nothing to redo right now.'
+              : 'No questions for this section on the phone yet. Connect to the internet once and try again.'),
         ),
       );
 }
@@ -460,7 +470,7 @@ class _ResultView extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
       children: [
         Center(
-          child: Text('${marksText(r.marks)} / ${r.total}',
+          child: Text('${marksText(r.marks)} / ${marksText(r.maxMarks)}',
               style: text.displaySmall?.copyWith(fontWeight: FontWeight.w900, color: AppPalette.periwinkle)),
         ),
         Center(child: Text('${(r.share * 100).round()}% · time ${_mmss(Duration(seconds: r.seconds))} of '
@@ -475,6 +485,21 @@ class _ResultView extends StatelessWidget {
             Expanded(child: _Count('${r.skipped}', 'skipped', AppPalette.textMuted)),
           ],
         ),
+        if (plan.isMixed) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            alignment: WrapAlignment.center,
+            children: [
+              for (final (s, right, asked) in _bySection(questions, chosen))
+                Chip(
+                  visualDensity: VisualDensity.compact,
+                  label: Text('${s.short} $right/$asked'),
+                ),
+            ],
+          ),
+        ],
         if (!r.counts) ...[
           const SizedBox(height: 10),
           const MutedNote('Answer at least half the questions to earn XP.'),
@@ -489,7 +514,17 @@ class _ResultView extends StatelessWidget {
           children: [
             Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Done'))),
             const SizedBox(width: 10),
-            Expanded(child: FilledButton(onPressed: onAgain, child: const Text('Another test'))),
+            Expanded(
+              child: switch (plan.planKind) {
+                PlanKind.daily => FilledButton.icon(
+                    onPressed: () => SharePlus.instance.share(ShareParams(text: dailyShareText(r, plan.day!))),
+                    icon: const Icon(Icons.share_rounded, size: 18),
+                    label: const Text('Share'),
+                  ),
+                PlanKind.review => FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Back')),
+                _ => FilledButton(onPressed: onAgain, child: const Text('Another test')),
+              },
+            ),
           ],
         ),
         const SizedBox(height: 24),
@@ -581,13 +616,21 @@ class _Review extends StatelessWidget {
             Text(q.explanation, style: text.bodySmall),
           ],
           if (q.fromBank)
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: reported ? null : onReport,
-                icon: const Icon(Icons.flag_outlined, size: 16),
-                label: Text(reported ? 'Reported' : 'Wrong question?'),
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (q.source != null)
+                  TextButton.icon(
+                    onPressed: () => openExternal(context, q.source),
+                    icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                    label: const Text('Source'),
+                  ),
+                TextButton.icon(
+                  onPressed: reported ? null : onReport,
+                  icon: const Icon(Icons.flag_outlined, size: 16),
+                  label: Text(reported ? 'Reported' : 'Wrong question?'),
+                ),
+              ],
             ),
           if (!q.fromBank) const SizedBox(height: 6),
         ],
@@ -595,3 +638,20 @@ class _Review extends StatelessWidget {
     );
   }
 }
+
+/// Right / asked per section, in the order the sections came.
+List<(PracticeSection, int, int)> _bySection(List<PracticeQuestion> qs, List<int?> chosen) {
+  final tally = <PracticeSection, (int, int)>{};
+  for (final (i, q) in qs.indexed) {
+    final (r, n) = tally[q.section] ?? (0, 0);
+    tally[q.section] = (r + (i < chosen.length && chosen[i] == q.answer ? 1 : 0), n + 1);
+  }
+  return [for (final e in tally.entries) (e.key, e.value.$1, e.value.$2)];
+}
+
+const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/// "JobSummit Daily 10 · 24 Oct: 8/10 in 4:12" and the app's link.
+String dailyShareText(PracticeResult r, DateTime day) =>
+    'JobSummit Daily 10 · ${day.day} ${_months[day.month - 1]}: ${r.right}/${r.total} in '
+    '${_mmss(Duration(seconds: r.seconds))}. Try today’s: ${Env.homePageUrl}';

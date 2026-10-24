@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../domain/mistakes.dart';
 import '../domain/practice.dart';
 
 /// Your practice on this phone: past tests, the bank questions you've seen (so
@@ -49,6 +50,25 @@ abstract final class PracticeStore {
       final fresh = ids.toSet();
       final list = [...(prefs.getStringList(_kSeen(s)) ?? const <String>[]).where((id) => !fresh.contains(id)), ...fresh];
       await prefs.setStringList(_kSeen(s), list.length > keepSeen ? list.sublist(list.length - keepSeen) : list);
+    } catch (_) {}
+  }
+
+  static const _kMistakes = 'practice.mistakes';
+
+  static Future<List<MistakeCard>> mistakes() async {
+    try {
+      final raw = (await SharedPreferences.getInstance()).getString(_kMistakes);
+      if (raw == null) return const [];
+      return [for (final j in jsonDecode(raw) as List) if (MistakeCard.fromJson(j) case final c?) c];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<void> saveMistakes(List<MistakeCard> cards) async {
+    try {
+      await (await SharedPreferences.getInstance())
+          .setString(_kMistakes, jsonEncode([for (final c in cards) c.toJson()]));
     } catch (_) {}
   }
 

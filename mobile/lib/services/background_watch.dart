@@ -12,6 +12,7 @@ import 'database_service.dart';
 import 'deadline_reminders.dart';
 import 'exam_watch_service.dart';
 import 'home_widget.dart';
+import 'practice_store.dart';
 import 'notification_service.dart';
 import 'update_service.dart';
 
@@ -81,7 +82,7 @@ void watchCallbackDispatcher() {
       await DeadlineReminders(db).sync(jobs, now: now);
       // The home-screen widget: next last day, next exam.
       final agenda = buildAgenda(tracked: await db.listApplications(), jobs: jobs, now: now);
-      await HomeWidget.write(widgetSummary(agenda, now));
+      await HomeWidget.write(widgetSummary(agenda, now, practice: await PracticeStore.history()));
     } catch (_) {}
     // Forms started but not paid: a reminder the day before they close.
     // ...and a form's correction window, the day it opens.

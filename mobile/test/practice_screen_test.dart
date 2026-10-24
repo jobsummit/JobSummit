@@ -10,7 +10,7 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets('a maths test: answer, jump, submit, then marks and every answer', (tester) async {
-    await tester.pumpWidget(const ProviderScope(
+    await tester.pumpWidget(ProviderScope(
       child: MaterialApp(home: PracticeTestScreen(plan: PracticePlan.section(PracticeSection.quant, 10))),
     ));
     await tester.pumpAndSettle();
@@ -48,7 +48,7 @@ void main() {
       child: MaterialApp(
         home: Builder(
           builder: (context) => TextButton(
-            onPressed: () => PracticeTestScreen.open(context, const PracticePlan.section(PracticeSection.reasoning, 10)),
+            onPressed: () => PracticeTestScreen.open(context, PracticePlan.section(PracticeSection.reasoning, 10)),
             child: const Text('go'),
           ),
         ),

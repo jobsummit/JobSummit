@@ -20,8 +20,9 @@ void main() {
     expect(s.week, '2 jobs close this week');
   });
 
-  test('nothing coming: empty lines', () {
+  test('nothing coming: empty lines, and the Daily 10 waiting', () {
     final s = widgetSummary(const [], now);
-    expect(s.toJson().values.every((v) => v.isEmpty), isTrue);
+    expect([s.deadline, s.exam, s.week].every((v) => v.isEmpty), isTrue);
+    expect(s.daily, 'Daily 10 is ready');
   });
 }

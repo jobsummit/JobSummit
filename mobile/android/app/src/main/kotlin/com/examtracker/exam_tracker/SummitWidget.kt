@@ -11,8 +11,8 @@ import android.widget.RemoteViews
 import org.json.JSONObject
 
 /**
- * Home-screen widget: the next last day, the next exam, and how many jobs close
- * this week. The app writes the text (lib/services/home_widget.dart) into its
+ * Home-screen widget: the next last day, the next exam, how many jobs close
+ * this week, and today's Daily 10. The app writes the text (lib/services/home_widget.dart) into its
  * shared preferences; this only shows it. Tapping it opens the app.
  */
 class SummitWidget : AppWidgetProvider() {
@@ -41,6 +41,7 @@ class SummitWidget : AppWidgetProvider() {
             val deadline = data.optString("deadline")
             val exam = data.optString("exam")
             val week = data.optString("week")
+            val daily = data.optString("daily")
 
             val views = RemoteViews(context.packageName, R.layout.summit_widget)
             fun line(id: Int, text: String) {
@@ -50,6 +51,7 @@ class SummitWidget : AppWidgetProvider() {
             line(R.id.widget_deadline, if (deadline.isEmpty()) "" else "⏳ $deadline")
             line(R.id.widget_exam, if (exam.isEmpty()) "" else "📝 $exam")
             line(R.id.widget_week, week)
+            line(R.id.widget_daily, if (daily.isEmpty()) "" else "☀️ $daily")
             val empty = deadline.isEmpty() && exam.isEmpty() && week.isEmpty()
             line(R.id.widget_empty, if (empty) context.getString(R.string.widget_empty) else "")
 

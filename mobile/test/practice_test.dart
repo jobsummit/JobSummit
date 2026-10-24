@@ -213,7 +213,7 @@ void main() {
   group('marks', () {
     test('+1 right, −¼ wrong, 0 skipped', () {
       final qs = [for (var i = 0; i < 4; i++) bankQ('$i', i < 2 ? 'Idioms' : 'Synonyms')];
-      final r = grade(const PracticePlan.section(PracticeSection.english, 4), qs, [1, 0, null, 1],
+      final r = grade(PracticePlan.section(PracticeSection.english, 4), qs, [1, 0, null, 1],
           at: DateTime(2026, 10, 24), seconds: 90);
       expect((r.right, r.wrong, r.skipped), (2, 1, 1));
       expect(r.marks, 1.75);
@@ -225,16 +225,16 @@ void main() {
 
     test('a test with under half answered earns no XP', () {
       final qs = [for (var i = 0; i < 10; i++) bankQ('$i', 'Idioms')];
-      final r = grade(const PracticePlan.section(PracticeSection.english, 10), qs, [1, 1, 1, 1, ...List.filled(6, null)],
+      final r = grade(PracticePlan.section(PracticeSection.english, 10), qs, [1, 1, 1, 1, ...List.filled(6, null)],
           at: DateTime(2026), seconds: 10);
       expect(r.counts, isFalse);
     });
 
     test('times follow each section’s pace, in whole minutes', () {
-      expect(const PracticePlan.section(PracticeSection.quant, 10).time.inMinutes, 8);
-      expect(const PracticePlan.section(PracticeSection.gs, 25).time.inMinutes, 10);
-      expect(const PracticePlan.mock().count, 20);
-      expect(const PracticePlan.mock().time.inMinutes, 12);
+      expect(PracticePlan.section(PracticeSection.quant, 10).time.inMinutes, 8);
+      expect(PracticePlan.section(PracticeSection.gs, 25).time.inMinutes, 10);
+      expect(PracticePlan.mock().count, 20);
+      expect(PracticePlan.mock().time.inMinutes, 12);
     });
 
     test('a result survives saving', () {
