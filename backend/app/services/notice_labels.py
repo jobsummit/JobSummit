@@ -101,7 +101,11 @@ def _exam_list(catalog: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def _clean(raw: Any, ids: set[str]) -> dict[str, Any] | None:
+def _squash(s: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def _clean(raw: Any, ids: set[str], title: str = "") -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None
 
@@ -109,10 +113,20 @@ def _clean(raw: Any, ids: set[str]) -> dict[str, Any] | None:
         v = raw.get(key)
         return v.strip()[:80] if isinstance(v, str) and v.strip() and v.strip().lower() != "null" else None
 
-    exam, stage, year, numeral = text("exam"), text("stage"), text("year"), text("numeral")
+    exam, stage, year, numeral, advert = (
+        text("exam"),
+        text("stage"),
+        text("year"),
+        text("numeral"),
+        text("advert"),
+    )
+    # An advert number the title doesn't print is a guess ("CRP SPL-XVI"), and a wrong
+    # one would hide the notice from the exam it is about.
+    if advert and _squash(advert) not in _squash(title):
+        advert = None
     return {
         "exam": exam if exam in ids else None,
-        "advert": text("advert"),
+        "advert": advert,
         "year": year if year and _YEAR.match(year) else None,
         "numeral": numeral.upper() if numeral and _ROMAN.match(numeral.upper()) else None,
         "stage": stage.lower() if stage and stage.lower() in STAGES else None,
@@ -175,7 +189,10 @@ async def label_notices(
     fails, notices go without (the app then falls back to its word rules)."""
     for n in notices:
         if n["url"] in known:
-            n["about"] = known[n["url"]]
+            about = dict(known[n["url"]])
+            if about.get("advert") and _squash(about["advert"]) not in _squash(n["title"]):
+                about["advert"] = None  # labelled before guesses were dropped
+            n["about"] = about
     todo = [n for n in notices if "about" not in n]
     if not todo or not mistral_reader.configured():
         return 0
@@ -197,7 +214,7 @@ async def label_notices(
             for raw in answers:
                 i = raw.get("i") if isinstance(raw, dict) else None
                 if isinstance(i, int) and 0 <= i < len(batch):
-                    label = _clean(raw, ids)
+                    label = _clean(raw, ids, batch[i]["title"])
                     if label is not None:
                         batch[i]["about"] = label
     finally:

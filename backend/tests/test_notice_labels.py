@@ -31,17 +31,18 @@ def test_labels_known_from_the_last_file_are_not_asked_again(monkeypatch):
         asked.append(titles)
         labels = [
             {"i": 0, "exam": "rrb-ntpc-graduate", "advert": "CEN 06/2025", "year": "2026", "stage": "skill"},
-            {"i": 1, "exam": "made-up-exam", "stage": "the third one", "numeral": "xv", "year": "soon"},
-        ]
+            {"i": 1, "exam": "made-up-exam", "advert": "CEN 05/2024", "stage": "the third one", "numeral": "xv",
+             "year": "soon"},
+        ]  # fmt: skip
         content = json.dumps({"labels": labels})
         return httpx.Response(200, json={"choices": [{"message": {"content": content}}]})
 
     notices = _notices(
-        "RRB NTPC Graduate Level CBTST Admit Card 2026",
+        "RRB NTPC Graduate Level (CEN 06/2025) CBTST Admit Card 2026",
         "RRB Ministerial & Isolated Category Junior Translator (Hindi) Result",
         "IBPS SO XVI Mains Admit Card 2026",
     )
-    known = {"https://agg.example/2": {"exam": "ibps-so", "stage": "mains"}}
+    known = {"https://agg.example/2": {"exam": "ibps-so", "advert": "CRP SPL-XVI", "stage": "mains"}}
     client = httpx.AsyncClient(transport=httpx.MockTransport(answer))
     requests = asyncio.run(notice_labels.label_notices(notices, known, client=client))
 
@@ -54,9 +55,10 @@ def test_labels_known_from_the_last_file_are_not_asked_again(monkeypatch):
         "numeral": None,
         "stage": "skill",
     }
-    # Not an exam of the list, not a stage, not a year: dropped, not guessed.
+    # Not an exam of the list, not a stage, not a year, an advert the title doesn't
+    # print: dropped, not guessed.
     assert notices[1]["about"] == {"exam": None, "advert": None, "year": None, "numeral": "XV", "stage": None}
-    assert notices[2]["about"] == {"exam": "ibps-so", "stage": "mains"}
+    assert notices[2]["about"] == {"exam": "ibps-so", "advert": None, "stage": "mains"}
 
 
 def test_a_bare_list_or_chunked_answer_still_counts(monkeypatch):
