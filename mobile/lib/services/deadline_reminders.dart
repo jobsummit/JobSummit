@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../domain/exam_watcher.dart';
 import '../domain/feed_builder.dart';
 import '../domain/relevance.dart';
 import '../domain/urgency.dart';
@@ -155,6 +156,40 @@ abstract final class FormReminders {
       } catch (_) {}
     }
     return reminded;
+  }
+}
+
+/// The notification's correction window (dates read from its PDF, or from a
+/// correction notice the watcher found): one alert the day it opens, or the first
+/// day the app sees it open. Same key as the watcher's correction notice, so the two
+/// never both show.
+abstract final class CorrectionAlerts {
+  static const _prefix = 'alerts.correction.';
+
+  static Future<List<String>> sync(Iterable<TrackedApplication> apps, {required DateTime now}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateTime(now.year, now.month, now.day);
+    final alerted = <String>[];
+    for (final app in apps) {
+      final start = app.timeline?.editWindowStart;
+      final end = app.timeline?.editWindowEnd ?? start;
+      if (app.archived || start == null || end == null) continue;
+      if (today.isBefore(start) || today.isAfter(end) || app.examOver(now)) continue;
+      final stamp = '${start.millisecondsSinceEpoch}';
+      if (prefs.getString('$_prefix${app.id}') == stamp) continue;
+      try {
+        await NotificationService.show(
+          key: '${app.id}-${Milestone.correction.wire}',
+          title: '✏️ Form correction open: ${app.examName}',
+          body: 'Fix mistakes in your form till ${formatDue(DateTime(end.year, end.month, end.day, 23, 59))}.',
+          url: app.timeline?.correctionUrl ?? app.loginUrl,
+          now: now,
+        );
+      } catch (_) {}
+      await prefs.setString('$_prefix${app.id}', stamp);
+      alerted.add(app.id);
+    }
+    return alerted;
   }
 }
 

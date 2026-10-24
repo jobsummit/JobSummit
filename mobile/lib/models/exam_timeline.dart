@@ -10,6 +10,7 @@ class ExamTimeline {
     this.feeDeadline,
     this.editWindowStart,
     this.editWindowEnd,
+    this.correctionUrl,
     this.admitCardRelease,
     this.admitCardUrl,
     this.examStart,
@@ -33,6 +34,9 @@ class ExamTimeline {
   final DateTime? feeDeadline;
   final DateTime? editWindowStart;
   final DateTime? editWindowEnd;
+
+  /// The correction notice the exam watcher found.
+  final String? correctionUrl;
   final DateTime? admitCardRelease;
   final String? admitCardUrl;
   final DateTime? examStart;
@@ -66,6 +70,7 @@ class ExamTimeline {
         feeDeadline: _date(j['fee_deadline']),
         editWindowStart: _date(j['edit_window_start']),
         editWindowEnd: _date(j['edit_window_end']),
+        correctionUrl: _url(j['correction_url']),
         admitCardRelease: _date(j['admit_card_release']),
         admitCardUrl: _url(j['admit_card_url']),
         examStart: _date(j['exam_start']),

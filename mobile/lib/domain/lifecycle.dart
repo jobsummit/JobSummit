@@ -99,6 +99,8 @@ List<StageView> computeLifecycle(TrackedApplication app, ExamTimeline? t, DateTi
           StageAction('Finish & pay', app.loginUrl!, primary: true)
         else if (app.applicationUrl != null)
           StageAction('Application login', app.applicationUrl!),
+        if (t?.correctionUrl != null && !_passed(t!.editWindowEnd, now))
+          StageAction('Correction notice', t.correctionUrl!),
       ],
     ),
     StageView(

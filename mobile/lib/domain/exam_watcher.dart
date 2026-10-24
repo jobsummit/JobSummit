@@ -18,6 +18,9 @@ enum Milestone {
   result('result'),
   answerKey('answer_key'),
   admitCard('admit_card'),
+
+  /// The form's correction (edit) window: no stage of its own, but a deadline.
+  correction('correction'),
   examSchedule('exam_schedule');
 
   const Milestone(this.wire);
@@ -63,6 +66,17 @@ final List<(Milestone, RegExp)> milestonePatterns = [
     Milestone.admitCard,
     _phrases(
         [r'e-?admit cards?', r'admit cards?', r'hall tickets?', r'call letters?', 'admission certificate']),
+  ),
+  (
+    Milestone.correction,
+    _phrases([
+      r'correction (?:window|facility|portal|link|module)',
+      r'(?:application|form|online) (?:form )?correction',
+      r'correction in (?:the )?(?:online )?application',
+      r'modification (?:window|facility)',
+      r'edit (?:window|facility|option)',
+      r'rectification (?:window|facility)',
+    ]),
   ),
   (
     Milestone.examSchedule,
@@ -856,6 +870,12 @@ Map<String, dynamic> fillTimeline(Map<String, dynamic> timeline, DetectedUpdate 
     case Milestone.result:
       t[text.contains('score') ? 'scorecard_url' : 'merit_list_url'] = u.open;
       firstDate('result_date');
+    case Milestone.correction:
+      t['correction_url'] = u.open;
+      if (start != null) {
+        t['edit_window_start'] = _isoDate(start);
+        t['edit_window_end'] = _isoDate(end ?? start);
+      }
   }
   return t;
 }
@@ -868,7 +888,7 @@ Map<String, dynamic> refreshExamDates(Map<String, dynamic> timeline, List<ExamUp
   var t = {...timeline};
   for (final u in updates.reversed) {
     final m = Milestone.fromWire(u.milestone);
-    if (m == null || m == Milestone.answerKey || m == Milestone.result) continue;
+    if (m == null || m == Milestone.answerKey || m == Milestone.result || m == Milestone.correction) continue;
     final seen = u.detectedAt?.toLocal() ?? now;
     final w = extractEventWindow(u.title, reference: seen);
     if (w == null) continue;
@@ -901,6 +921,7 @@ Map<String, dynamic> refreshExamDates(Map<String, dynamic> timeline, List<ExamUp
       ),
     Milestone.examSchedule => ('📅 Exam date update: $examName', noticeTitle),
     Milestone.postponed => ('⚠️ Exam rescheduled: $examName', noticeTitle),
+    Milestone.correction => ('✏️ Form correction open: $examName', noticeTitle),
     Milestone.answerKey => (
         '📝 Answer key released: $examName',
         'Check your answers; objections have a deadline.'

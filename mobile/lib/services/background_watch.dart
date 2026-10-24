@@ -77,8 +77,11 @@ void watchCallbackDispatcher() {
       await DeadlineReminders(db).sync(await loadOpenJobs(db, now: now), now: now);
     } catch (_) {}
     // Forms started but not paid: a reminder the day before they close.
+    // ...and a form's correction window, the day it opens.
     try {
-      await FormReminders.sync(await db.listApplications(), now: DateTime.now());
+      final apps = await db.listApplications();
+      await FormReminders.sync(apps, now: DateTime.now());
+      await CorrectionAlerts.sync(apps, now: DateTime.now());
     } catch (_) {}
     // A new version: download it on Wi-Fi and, where Android allows, install it
     // without asking while the app isn't on screen.
