@@ -49,6 +49,11 @@ class Settings(BaseSettings):
         "mistral-large-latest,mistral-medium-latest,mistral-small-latest,"
         "ministral-14b-latest,ministral-8b-latest"
     )
+    # The job-picks model (app/services/picks.py): a small model labels career tracks,
+    # and the shared choices people opted in to come from Supabase (secret key only).
+    picks_models: str = "ministral-8b-latest,ministral-14b-latest,mistral-small-latest"
+    supabase_url: str = "https://mowurjbmifkwlaogidns.supabase.co"
+    supabase_secret_key: SecretStr = SecretStr("")
 
     # --- Uploads ------------------------------------------------------------
     upload_dir: Path = Path("/data/notifications")

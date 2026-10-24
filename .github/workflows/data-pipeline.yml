@@ -144,6 +144,23 @@ jobs:
           fi
           python -m app.services.practice_bank --dir ../publish/practice
 
+      # Job-picks model: a small model labels each new job's career track, and the
+      # choices people opted in to share (Supabase, secret SUPABASE_SECRET_KEY) give
+      # per-degree weights the app ranks with. Without the secret only the labels
+      # update; a failed run publishes the last picks.json unchanged.
+      - name: Job picks model
+        continue-on-error: true
+        timeout-minutes: 6
+        working-directory: backend
+        env:
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY || '' }}
+        run: |
+          if git fetch -q --depth=1 origin data 2>/dev/null; then
+            git show FETCH_HEAD:picks.json > /tmp/previous_picks.json 2>/dev/null || true
+            cp /tmp/previous_picks.json ../publish/picks.json 2>/dev/null || true
+          fi
+          python -m app.services.picks --jobs ../publish/jobs.json --previous /tmp/previous_picks.json --out ../publish/picks.json
+
       - name: Save state
         run: |
           mkdir -p publish/state
