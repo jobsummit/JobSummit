@@ -38,7 +38,7 @@ dependencies:
   self_update:
     path: packages/self_update
   package_info_plus: ^8.1.0
-  device_info_plus: ^11.1.0
+  device_info_plus: ^12.4.0
   shared_preferences: ^2.3.3
   workmanager: ^0.10.10
   flutter_local_notifications: ^18.0.1
