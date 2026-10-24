@@ -9,6 +9,7 @@ enum XpAction {
   setExamDate(10, 'Updated an exam date', perDay: 5),
   checkedDashboard(5, 'Checked a dashboard', perDay: 5),
   completedProfile(25, 'Finished your profile', perDay: 1),
+  practiced(10, 'Finished a practice test', perDay: 5),
   privateApplied(15, 'Applied to a company', perDay: 10),
   privateProgress(10, 'Moved an application forward', perDay: 10),
   privateOffer(50, 'Got an offer!', perDay: 3);

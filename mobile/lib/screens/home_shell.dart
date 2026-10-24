@@ -33,12 +33,14 @@ import 'agenda_screen.dart';
 import 'exam_journey_screen.dart';
 import 'jobs_screen.dart';
 import 'my_exams_screen.dart';
+import 'practice_screen.dart';
 import 'profile_setup_screen.dart';
 import 'today_screen.dart';
 
-/// Four tabs: Today (overview or one next step), Jobs (everything that fits you),
-/// My exams (lanes by stage), Agenda (what's coming, by date). The paper-cut
-/// Summit behind them slides down as you go right: full on Today, gone on Agenda.
+/// Five tabs: Today (overview or one next step), Jobs (everything that fits you),
+/// My exams (lanes by stage), Agenda (what's coming, by date), Practice (timed
+/// sectional tests). The paper-cut Summit behind them slides down as you go
+/// right: full on Today, gone on Agenda and Practice.
 class HomeShell extends ConsumerWidget {
   const HomeShell({super.key});
 
@@ -60,7 +62,7 @@ class HomeShell extends ConsumerWidget {
               bottom: false,
               child: TabSwitcher(
                 index: tab,
-                children: const [TodayScreen(), JobsScreen(), MyExamsScreen(), AgendaScreen()],
+                children: const [TodayScreen(), JobsScreen(), MyExamsScreen(), AgendaScreen(), PracticeScreen()],
               ),
             ),
             // My exams: the Summit trail on the mountain, your exams climbing it.
@@ -112,6 +114,11 @@ class HomeShell extends ConsumerWidget {
               ),
               selectedIcon: const DuoIcon(AppIcon.examDay),
               label: 'Agenda',
+            ),
+            const NavigationDestination(
+              icon: DuoIcon(AppIcon.practice),
+              selectedIcon: DuoIcon(AppIcon.practice),
+              label: 'Practice',
             ),
           ],
         ),

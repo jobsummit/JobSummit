@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/fees.dart';
+import '../domain/practice.dart';
 import '../domain/subjects.dart';
 import '../models/tracked_application.dart';
 import '../models/user_profile.dart';
 import '../providers/account_providers.dart';
+import '../providers/practice_providers.dart';
 import '../providers/providers.dart';
 import '../providers/xp_providers.dart';
 import '../theme/app_theme.dart';
@@ -45,6 +47,7 @@ class ProfileScreen extends ConsumerWidget {
     final apps = ref.watch(trackedAppsProvider).dataOrNull ?? const <TrackedApplication>[];
     final admitCards = apps.where((a) => a.displayStatus.index >= TrackerStatus.admitCardLive.index).length;
     final keys = xp.earned.keys;
+    final practice = ref.watch(practiceHistoryProvider).valueOrNull ?? const <PracticeResult>[];
     final badges = [
       ProfileBadge(Icons.flag_rounded, 'First step', 'Track your first exam',
           earned: apps.isNotEmpty || keys.any((k) => k.startsWith('job:') || k.startsWith('exam:')),
@@ -57,6 +60,8 @@ class ProfileScreen extends ConsumerWidget {
           earned: admitCards > 0, color: AppPalette.lavender),
       ProfileBadge(Icons.workspace_premium_rounded, 'Contender', 'Reach level 4',
           earned: xp.level >= 4, color: AppPalette.periwinkle),
+      ProfileBadge(Icons.bolt_rounded, 'Sharp', 'Score 80% in a full test or the mini mock',
+          earned: practice.any((r) => r.total >= 20 && r.share >= 0.8), color: AppPalette.honey),
     ];
     final qualifies = profile == null
         ? const <String>[]

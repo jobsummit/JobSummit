@@ -167,7 +167,7 @@ void main() {
     expect(shown(), inExclusiveRange(0, SummitHeights.full)); // on its way
     await tester.pumpAndSettle();
     expect(shown(), 0);
-    expect(SummitHeights.govtTabs, [SummitHeights.today, SummitHeights.jobs, SummitHeights.exams, 0]);
+    expect(SummitHeights.govtTabs, [SummitHeights.today, SummitHeights.jobs, SummitHeights.exams, 0, 0]);
   });
 
   testWidgets('the pill switch selects and reports a new choice', (tester) async {

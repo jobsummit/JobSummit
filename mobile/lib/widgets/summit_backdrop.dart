@@ -5,20 +5,21 @@ import 'motion.dart';
 
 /// How much of the mountain each screen shows below the status bar: all of it
 /// with the moon or sun on Today, half on Jobs, the whole climb (with your exams on
-/// its trail) on My exams, none on Agenda. Switching tabs slides it between these.
+/// its trail) on My exams, none on Agenda and Practice. Switching tabs slides it between these.
 abstract final class SummitHeights {
   static const full = 236.0;
   static const today = full;
   static const jobs = 150.0;
   static const exams = 214.0;
   static const agenda = 0.0;
+  static const practice = 0.0;
 
   static const privateRoles = 206.0;
   static const privateApplications = 118.0;
   static const privateProfile = 168.0;
 
-  /// The Govt tabs, in order: Today, Jobs, My exams, Agenda.
-  static const govtTabs = [today, jobs, exams, agenda];
+  /// The Govt tabs, in order: Today, Jobs, My exams, Agenda, Practice.
+  static const govtTabs = [today, jobs, exams, agenda, practice];
 
   /// The Private tabs: Roles, Applications, Profile.
   static const privateTabs = [privateRoles, privateApplications, privateProfile];
