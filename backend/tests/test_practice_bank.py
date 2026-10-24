@@ -22,7 +22,7 @@ def _run(folder, handler, monkeypatch, models="writer-model,checker-model"):
     monkeypatch.setattr(get_settings(), "practice_models", models)
     monkeypatch.setattr(practice_bank, "SECTIONS", {"gs": practice_bank.SECTIONS["gs"]})
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    return asyncio.run(practice_bank.grow(folder, client=client, seed=1))
+    return asyncio.run(practice_bank.grow(folder, client=client, seed=1, current=False))
 
 
 def test_only_questions_both_models_agree_on_are_kept(tmp_path, monkeypatch):

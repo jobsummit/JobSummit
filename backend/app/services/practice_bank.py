@@ -149,23 +149,32 @@ def _valid(raw: Any, section: str, topic: str) -> dict[str, Any] | None:
     }
 
 
-def load(path: Path) -> list[dict[str, Any]]:
+def load_raw(path: Path) -> dict[str, Any]:
+    """The whole file ({} when missing or unreadable)."""
     if not path.exists():
-        return []
+        return {}
     try:
-        questions = json.loads(path.read_text(encoding="utf-8")).get("questions", [])
-    except (ValueError, AttributeError):
-        return []
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def load(path: Path) -> list[dict[str, Any]]:
+    questions = load_raw(path).get("questions", [])
     return [q for q in questions if isinstance(q, dict) and q.get("id") and q.get("q")]
 
 
-def save(path: Path, section: str, questions: list[dict[str, Any]]) -> None:
+def save(
+    path: Path, section: str, questions: list[dict[str, Any]], *, extra: dict[str, Any] | None = None
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     body = {
         "section": section,
         "updated": datetime.now(UTC).isoformat(timespec="seconds"),
         "count": len(questions),
         "questions": questions,
+        **(extra or {}),
     }
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(body, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
@@ -188,14 +197,20 @@ class _Models:
 
 
 async def _chat(
-    http: httpx.AsyncClient, models: _Models, system: str, user: str, *, other_than: str | None = None
+    http: httpx.AsyncClient,
+    models: _Models,
+    system: str,
+    user: str,
+    *,
+    other_than: str | None = None,
+    temperature: float | None = None,
 ):
     """(model, answer object), or (None, None) when no model will answer."""
     headers = {"Authorization": f"Bearer {get_settings().mistral_api_key.get_secret_value()}"}
     while (model := models.pick(other_than)) is not None:
         body = {
             "model": model,
-            "temperature": 0.7 if system is WRITE else 0,
+            "temperature": temperature if temperature is not None else (0.7 if system is WRITE else 0),
             "response_format": {"type": "json_object"},
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
         }
@@ -221,6 +236,25 @@ async def _chat(
             content = "".join(c.get("text", "") for c in content if isinstance(c, dict))
         return model, json.loads(content)
     return None, None
+
+
+def agreed_indexes(answer: Any, written: list[dict[str, Any]]) -> set[int]:
+    """The questions the checker answered the same as the writer."""
+    answers = answer.get("answers") if isinstance(answer, dict) else answer
+    agreed: set[int] = set()
+    for a in answers if isinstance(answers, list) else []:
+        i = a.get("i") if isinstance(a, dict) else None
+        said = a.get("answer") if isinstance(a, dict) else None
+        if isinstance(said, str) and said.strip().isdigit():
+            said = int(said)
+        if (
+            isinstance(i, int)
+            and 0 <= i < len(written)
+            and not isinstance(said, bool)
+            and said == written[i]["a"]
+        ):
+            agreed.add(i)
+    return agreed
 
 
 def _topics(section: str, bank: list[dict[str, Any]], rng: random.Random) -> list[str]:
@@ -274,20 +308,7 @@ async def grow_section(
     if checker is None:
         log.warning("No second model to check %s questions; none kept", section)
         return []
-    answers = answer.get("answers") if isinstance(answer, dict) else answer
-    agreed: set[int] = set()
-    for a in answers if isinstance(answers, list) else []:
-        i = a.get("i") if isinstance(a, dict) else None
-        said = a.get("answer") if isinstance(a, dict) else None
-        if isinstance(said, str) and said.strip().isdigit():
-            said = int(said)
-        if (
-            isinstance(i, int)
-            and 0 <= i < len(written)
-            and said == written[i]["a"]
-            and not isinstance(said, bool)
-        ):
-            agreed.add(i)
+    agreed = agreed_indexes(answer, written)
     kept = [q for i, q in enumerate(written) if i in agreed]
     log.info(
         "%s: %d written, %d agreed (%s, checked by %s)", section, len(written), len(kept), writer, checker
@@ -296,9 +317,10 @@ async def grow_section(
 
 
 async def grow(
-    folder: Path, *, client: httpx.AsyncClient | None = None, seed: int | None = None
+    folder: Path, *, client: httpx.AsyncClient | None = None, seed: int | None = None, current: bool = True
 ) -> dict[str, int]:
-    """Adds to each section's file in [folder]; returns how many each got."""
+    """Adds to each section's file in [folder] (and this week's current affairs);
+    returns how many each got."""
     if not mistral_reader.configured():
         log.info("No Mistral key: the practice bank stays as it is")
         return {}
@@ -309,6 +331,13 @@ async def grow(
     http = client or httpx.AsyncClient(timeout=get_settings().mistral_timeout_s)
     added: dict[str, int] = {}
     try:
+        if current:  # first: news is the one that can't wait
+            from app.services.current_affairs import grow_current
+
+            try:
+                added["current"] = await grow_current(http, models, folder / "current.json", deadline)
+            except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError, AttributeError) as exc:
+                log.warning("Current affairs failed (%s); next run", exc)
         for section in SECTIONS:
             path = folder / f"{section}.json"
             bank = load(path)
@@ -336,7 +365,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     added = asyncio.run(grow(args.dir))
-    counts = {s: len(load(args.dir / f"{s}.json")) for s in SECTIONS}
+    counts = {s: len(load(args.dir / f"{s}.json")) for s in [*SECTIONS, "current"]}
     print(json.dumps({"added": added, "total": counts}))
     return 0
 
