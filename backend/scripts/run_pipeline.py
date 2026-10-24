@@ -73,6 +73,8 @@ ADDED_COLUMNS = (
     "ALTER TABLE post_details ADD COLUMN IF NOT EXISTS pay_scale VARCHAR(300)",
     "ALTER TABLE post_details ADD COLUMN IF NOT EXISTS monthly_pay_min INTEGER",
     "ALTER TYPE parser_key ADD VALUE IF NOT EXISTS 'wordpress_posts'",
+    "ALTER TABLE job_posts ADD COLUMN IF NOT EXISTS fees JSONB",
+    "ALTER TABLE job_posts ADD COLUMN IF NOT EXISTS fee_refund VARCHAR(300)",
 )
 
 

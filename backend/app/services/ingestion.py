@@ -51,6 +51,8 @@ def _to_orm(
         portal_url=parsed.portal_url,
         apply_url=apply_url[:1000] if apply_url else None,
         employment_type=parsed.employment_type,
+        fees=parsed.fees or None,
+        fee_refund=parsed.fee_refund,
         application_start=parsed.application_start,
         application_deadline=parsed.application_deadline,
         exam_date=parsed.exam_date,

@@ -139,6 +139,8 @@ def job_json(job: JobPost) -> dict[str, Any]:
         "apply_url": job.apply_url,  # the registration page itself, when a job site links it
         "category": job_category(job.organization, job.exam_name),
         "employment_type": job.employment_type,
+        "fees": job.fees or {},
+        "fee_refund": job.fee_refund,
         "application_start": _iso(job.application_start),
         "application_deadline": _iso(job.application_deadline),
         "exam_date": _iso(job.exam_date),
@@ -175,7 +177,7 @@ _IST = timedelta(hours=5, minutes=30)
 
 
 def advert_key(advert: str | None) -> str | None:
-    """"CEN No. 06/2026" and "CEN 6/2026" -> "cen-6-2026"; None when too short to tell."""
+    """ "CEN No. 06/2026" and "CEN 6/2026" -> "cen-6-2026"; None when too short to tell."""
     if not advert:
         return None
     parts = re.findall(r"[a-z]+|\d+", _ADVERT_FILLER.sub(" ", advert.lower()))

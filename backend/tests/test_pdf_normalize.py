@@ -26,6 +26,8 @@ def _raw(**over) -> NotificationExtraction:
         "answer_key_date": None,
         "result_date": None,
         "employment_type": None,
+        "application_fees": [],
+        "fee_refund": None,
         "general_age_relaxations": [
             {"category": "OBC (NCL)", "years": 3},
             {"category": "SC/ST", "years": 5},
@@ -68,6 +70,24 @@ def test_happy_path():
     assert post.eligible_streams == ["B.E./B.Tech Electronics & Communication"]
     assert post.vacancy.total == 21
     assert not n.needs_review, n.review_notes
+
+
+def test_fees_are_kept_per_category_and_misreads_dropped():
+    n = normalize_extraction(
+        _raw(
+            application_fees=[
+                {"category": "General", "amount": 500},
+                {"category": "SC", "amount": 250},
+                {"category": "Female", "amount": 250},
+                {"category": "OBC", "amount": 50000},  # a misread
+                {"category": "Domicile", "amount": 100},  # not a category
+            ],
+            fee_refund="Rs 400 refunded on appearing in CBT-1",
+        ),
+        tz=IST,
+    )
+    assert n.fees == {"UR": 500, "SC": 250, "WOMEN": 250}
+    assert n.fee_refund == "Rs 400 refunded on appearing in CBT-1"
 
 
 def test_seat_mismatch_flags_review():

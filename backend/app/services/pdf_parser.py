@@ -169,6 +169,8 @@ Rules:
   pay / stipend; null when nothing is printed.
 - `employment_type`: permanent (regular posts), contract (fixed-term / consolidated pay),
   apprenticeship, fellowship (JRF/SRF), or internship.
+- `application_fees`: the fee table, one entry per category in rupees (UR for General; 0 for
+  "exempted"/"nil"); one ALL entry when everyone pays the same. `fee_refund`: only if printed.
 - Bilingual (Hindi/English) PDFs: use the English text.
 """
 
@@ -761,5 +763,24 @@ def normalize_extraction(raw: NotificationExtraction, *, tz: ZoneInfo) -> Parsed
         posts=posts,
         timeline=timeline,
         employment_type=_employment_type(raw.employment_type),
+        fees=_fees(raw.application_fees),
+        fee_refund=(raw.fee_refund or "").strip()[:300] or None,
         review_notes=notes,
     )
+
+
+_FEE_CATEGORIES = {
+    "UR": "UR", "GEN": "UR", "GENERAL": "UR", "OBC": "OBC", "OBC-NCL": "OBC", "EWS": "EWS", "SC": "SC",
+    "ST": "ST", "PWBD": "PWBD", "PWD": "PWBD", "PH": "PWBD", "WOMEN": "WOMEN", "FEMALE": "WOMEN",
+    "EXSM": "EXSM", "ESM": "EXSM", "EX-SERVICEMEN": "EXSM", "ALL": "ALL",
+}  # fmt: skip
+
+
+def _fees(raw: list | None) -> dict[str, int]:
+    """Known categories with a plausible amount (a fee above Rs 5,000 is a misread)."""
+    out: dict[str, int] = {}
+    for f in raw or []:
+        key = _FEE_CATEGORIES.get((f.category or "").strip().upper().replace(" ", ""))
+        if key and isinstance(f.amount, int) and 0 <= f.amount <= 5000 and key not in out:
+            out[key] = f.amount
+    return out

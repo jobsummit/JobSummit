@@ -62,6 +62,9 @@ class ParsedNotification(BaseModel):
     posts: list[ParsedPost] = Field(min_length=1)
     timeline: ParsedTimeline = Field(default_factory=ParsedTimeline)
     employment_type: str | None = None  # permanent | contract | apprenticeship | fellowship | internship
+    # Fee in rupees per category ("UR", "SC", ..., "ALL" when one fee for everyone).
+    fees: dict[str, int] = Field(default_factory=dict)
+    fee_refund: str | None = Field(None, max_length=300)
     review_notes: list[str] = Field(default_factory=list)
     extraction_model: str | None = None  # the Gemini model that actually read it
 

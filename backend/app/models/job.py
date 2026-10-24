@@ -32,6 +32,9 @@ class JobPost(UUIDPkMixin, TimestampMixin, Base):
     # link); portal_url is the website the exam watcher checks for notices.
     apply_url: Mapped[str | None] = mapped_column(String(1000))
     employment_type: Mapped[str | None] = mapped_column(String(20))
+    # Fee in rupees per category ({"UR": 500, "SC": 250}), and a refund rule if printed.
+    fees: Mapped[dict | None] = mapped_column(JSONB)
+    fee_refund: Mapped[str | None] = mapped_column(String(300))
     application_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     application_deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     exam_date: Mapped[date | None]

@@ -37,7 +37,9 @@ NTPC_POSTS = ["Goods Train Manager", "Senior Clerk cum Typist", "Junior Accounts
 
 
 def test_advert_numbers_written_differently():
-    assert advert_key("CEN No. 06/2026") == advert_key("CEN 06/2026") == advert_key("CEN 6/2026") == "cen-6-2026"
+    assert (
+        advert_key("CEN No. 06/2026") == advert_key("CEN 06/2026") == advert_key("CEN 6/2026") == "cen-6-2026"
+    )
     assert advert_key("Ref: GHB/ADM/1708 /2026") == advert_key("GHB/ADM/1708/2026")
     assert advert_key("No.") is None
     assert advert_key(None) is None
@@ -54,7 +56,9 @@ def test_one_board_named_two_ways():
 
 
 def test_two_copies_of_rrb_ntpc_become_one():
-    from_pdf = _job("Railway Recruitment Board (RRB)", "CEN 06/2026", NTPC_POSTS, portal_url="https://rrb.gov.in")
+    from_pdf = _job(
+        "Railway Recruitment Board (RRB)", "CEN 06/2026", NTPC_POSTS, portal_url="https://rrb.gov.in"
+    )
     from_page = _job(
         "Railway Recruitment Boards",
         "CEN No. 06/2026",

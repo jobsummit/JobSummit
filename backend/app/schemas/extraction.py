@@ -14,6 +14,11 @@ class ExtractedRelaxation(BaseModel):
     years: int = Field(description="Upper age relaxation in years for this category")
 
 
+class ExtractedFee(BaseModel):
+    category: str = Field(description="One of: UR, OBC, EWS, SC, ST, PWBD, WOMEN, EXSM, ALL")
+    amount: int = Field(description="Application fee in rupees for this category (0 if exempt)")
+
+
 class ExtractedVacancy(BaseModel):
     ur: int | None = Field(description="Unreserved / General / UR / GEN seats")
     sc: int | None = Field(description="Scheduled Caste seats")
@@ -88,6 +93,12 @@ class NotificationExtraction(BaseModel):
     result_date: str | None = Field(description="Tentative result declaration date")
     employment_type: str | None = Field(
         description="One of: permanent, contract, apprenticeship, fellowship, internship"
+    )
+    application_fees: list[ExtractedFee] = Field(
+        description="Application / exam fee per category as printed (UR = General); empty if not printed"
+    )
+    fee_refund: str | None = Field(
+        description="Fee refund rule if printed, short, e.g. 'Rs 400 refunded on appearing in CBT-1'"
     )
     general_age_relaxations: list[ExtractedRelaxation]
     posts: list[ExtractedPost]
