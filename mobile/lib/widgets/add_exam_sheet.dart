@@ -9,22 +9,25 @@ import 'app_icons.dart';
 /// Track an exam applied to outside the feed. Typing suggests common exams
 /// (built into the app, so instant and offline); picking one fills in its name,
 /// candidate login, board website and stages. Anything else: a custom exam.
-Future<void> showAddExamSheet(BuildContext context) => showModalBottomSheet<void>(
+/// [name]: what to start with (a shared job's title).
+Future<void> showAddExamSheet(BuildContext context, {String name = ''}) => showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => const _AddExamSheet(),
+      builder: (_) => _AddExamSheet(name: name),
     );
 
 class _AddExamSheet extends ConsumerStatefulWidget {
-  const _AddExamSheet();
+  const _AddExamSheet({this.name = ''});
+
+  final String name;
 
   @override
   ConsumerState<_AddExamSheet> createState() => _AddExamSheetState();
 }
 
 class _AddExamSheetState extends ConsumerState<_AddExamSheet> {
-  final _name = TextEditingController();
+  late final _name = TextEditingController(text: widget.name);
   final _login = TextEditingController();
   final _official = TextEditingController();
   CatalogExam? _picked;

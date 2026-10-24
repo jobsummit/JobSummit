@@ -17,11 +17,13 @@ import '../providers/providers.dart';
 import '../services/auth_service.dart';
 import '../services/deadline_reminders.dart';
 import '../services/notification_service.dart';
+import '../services/share_intake.dart';
 import '../theme/app_theme.dart';
 import '../utils/system_actions.dart';
 import '../widgets/app_icons.dart';
 import '../widgets/motion.dart';
 import '../widgets/samsung_sleep_tip.dart';
+import '../widgets/shared_job_sheet.dart';
 import '../widgets/summit_backdrop.dart';
 import '../widgets/summit_trail.dart';
 import '../widgets/welcome_sheet.dart';
@@ -211,6 +213,7 @@ class _AccountGateState extends ConsumerState<AccountGate> {
       unawaited(FormReminders.sync(apps, now: DateTime.now()).catchError((_) => const <String>[]));
     });
     NotificationService.openInApp.addListener(_openFromNotification);
+    ShareIntake.incoming.addListener(_openShared);
     WidgetsBinding.instance.addPostFrameCallback((_) => _startup());
   }
 
@@ -220,7 +223,16 @@ class _AccountGateState extends ConsumerState<AccountGate> {
   void dispose() {
     _reminderDebounce?.cancel();
     NotificationService.openInApp.removeListener(_openFromNotification);
+    ShareIntake.incoming.removeListener(_openShared);
     super.dispose();
+  }
+
+  /// A job shared from WhatsApp, Telegram or the browser: find it.
+  void _openShared() {
+    final shared = ShareIntake.incoming.value;
+    if (shared == null || !mounted || !_startupDone) return;
+    ShareIntake.incoming.value = null;
+    showSharedJobSheet(context, shared);
   }
 
   /// The morning summary opens the Agenda (jobs by closing day).
@@ -253,6 +265,7 @@ class _AccountGateState extends ConsumerState<AccountGate> {
     await _askNotificationsOnce();
     await _samsungTipOnce();
     unawaited(NotificationService.openLaunchLink()); // a notification tap opened the app
+    unawaited(ShareIntake.init().then((_) => _openShared())); // a shared job opened the app
     unawaited(ref.read(trackedAppsProvider.notifier).checkForUpdates()); // throttled
     unawaited(ref.read(backupControllerProvider.notifier).syncIfDue());
   }

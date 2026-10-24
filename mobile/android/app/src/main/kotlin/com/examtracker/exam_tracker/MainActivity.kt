@@ -2,6 +2,7 @@ package com.examtracker.exam_tracker
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.SoundPool
@@ -13,10 +14,22 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private var sounds: SoundPool? = null
     private val soundIds = mutableMapOf<String, Int>()
+    private var shareChannel: MethodChannel? = null
+    private var pendingShare: String? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         val messenger = flutterEngine.dartExecutor.binaryMessenger
+
+        // A job shared to the app: Dart takes the one that opened it, and hears of later ones.
+        pendingShare = sharedText(intent)
+        shareChannel = MethodChannel(messenger, "jobsummit/share").apply {
+            setMethodCallHandler { call, result ->
+                if (call.method != "take") return@setMethodCallHandler result.notImplemented()
+                result.success(pendingShare)
+                pendingShare = null
+            }
+        }
 
         // Copies a password marked "sensitive": Android 13+ shows no preview of it, and
         // keyboards (Gboard and others) keep it out of their clipboard history.
@@ -66,6 +79,20 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val text = sharedText(intent) ?: return
+        val channel = shareChannel
+        if (channel == null) pendingShare = text else channel.invokeMethod("shared", text)
+    }
+
+    private fun sharedText(intent: Intent?): String? {
+        if (intent?.action != Intent.ACTION_SEND || intent.type?.startsWith("text/") != true) return null
+        val parts = listOfNotNull(intent.getStringExtra(Intent.EXTRA_SUBJECT), intent.getStringExtra(Intent.EXTRA_TEXT))
+        return parts.joinToString("\n").takeIf { it.isNotBlank() }?.take(4000)
     }
 
     override fun onDestroy() {
