@@ -37,7 +37,7 @@ dependencies:
   # In-app updates (direct/GitHub flavour only; disabled in store builds)
   self_update:
     path: packages/self_update
-  package_info_plus: ^8.1.0
+  package_info_plus: ^9.0.1
   device_info_plus: ^11.1.0
   shared_preferences: ^2.3.3
   workmanager: ^0.10.10
