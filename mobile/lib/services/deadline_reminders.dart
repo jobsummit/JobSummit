@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../domain/exam_clash.dart';
 import '../domain/exam_watcher.dart';
 import '../domain/feed_builder.dart';
 import '../domain/relevance.dart';
@@ -190,6 +191,38 @@ abstract final class CorrectionAlerts {
       alerted.add(app.id);
     }
     return alerted;
+  }
+}
+
+/// Two of your exams on the same day (both one-day exams): one alert per pair and
+/// day, as soon as the second date is known. Windows that only may clash are shown
+/// in the app, not alerted.
+abstract final class ClashAlerts {
+  static const _prefix = 'alerts.clash.';
+
+  static Future<List<String>> sync(List<TrackedApplication> apps, {required DateTime now}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final byId = {for (final a in apps) a.id: a};
+    final sent = <String>[];
+    for (final MapEntry(key: id, value: clashes) in examClashes(apps, now).entries) {
+      for (final c in clashes.where((c) => c.sure)) {
+        final other = apps.firstWhere((a) => a.examName == c.other && a.id != id);
+        final pair = ([id, other.id]..sort()).join('|');
+        final key = '$_prefix$pair|${c.day.millisecondsSinceEpoch}';
+        if (prefs.getBool(key) ?? false) continue;
+        await prefs.setBool(key, true);
+        try {
+          await NotificationService.show(
+            key: 'clash-$pair',
+            title: '⚠️ Two exams on one day',
+            body: '${byId[id]!.examName} and ${c.other} are both on ${formatDue(c.day).split(',').first}.',
+            now: now,
+          );
+        } catch (_) {}
+        sent.add(pair);
+      }
+    }
+    return sent;
   }
 }
 

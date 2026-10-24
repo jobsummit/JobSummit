@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/delivery_track.dart';
+import '../domain/exam_clash.dart';
 import '../domain/lifecycle.dart';
 import '../models/tracked_application.dart';
 import '../providers/providers.dart';
@@ -246,6 +247,10 @@ class _ExamJourneyViewState extends ConsumerState<ExamJourneyView> {
                   _menu(context),
                 ],
               ),
+              for (final c in ref.watch(examClashesProvider)[app.id] ?? const <ExamClash>[]) ...[
+                const SizedBox(height: 10),
+                TonePill(label: '⚠️ ${c.label}', color: c.sure ? AppPalette.terracotta : AppPalette.honey),
+              ],
               // What's happening now, and its button, sit under the tracker below.
               if ((app.totalSeats ?? 0) > 0) ...[
                 // 0 = the notice didn't say

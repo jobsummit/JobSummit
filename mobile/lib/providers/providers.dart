@@ -1,5 +1,6 @@
 
 
+import '../domain/exam_clash.dart';
 import '../domain/exam_watcher.dart';
 import '../domain/feed_builder.dart';
 import '../domain/next_step.dart';
@@ -364,6 +365,12 @@ final activeAppsProvider = Provider<List<TrackedApplication>>((ref) {
     for (final a in all)
       if (!a.archived) a
   ];
+});
+
+/// Your exams that fall on the same day as another of yours, by app id.
+final examClashesProvider = Provider<Map<String, List<ExamClash>>>((ref) {
+  final now = ref.watch(nowProvider);
+  return examClashes(ref.watch(activeAppsProvider), DateTime(now.year, now.month, now.day));
 });
 
 final vaultEntryProvider = FutureProvider.autoDispose

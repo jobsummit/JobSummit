@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/exam_clash.dart';
 import '../domain/relevance.dart';
 import '../domain/xp.dart';
 import '../domain/urgency.dart';
@@ -156,6 +157,7 @@ class _JobCardState extends ConsumerState<JobCard> {
     final jobCategory = JobCategory.fromWire(item.category);
     // Several posts you fit, one application (RRB NTPC, SSC CGL): the exam is the title.
     final several = item.posts.length > 1;
+    final clash = jobClash(item, ref.watch(activeAppsProvider), now);
 
     return AppCard(
       accent: context.urgencyColors.of(item.urgency),
@@ -192,6 +194,10 @@ class _JobCardState extends ConsumerState<JobCard> {
                 TonePill(
                     label: suggestionBadge(post.suggestionReasons), color: context.urgencyColors.warning),
               if (post.eligibleViaRelaxation) const StatusPill(label: 'Via age relaxation'),
+              if (clash != null)
+                TonePill(
+                    label: '⚠️ Exam ${clash.label[0].toLowerCase()}${clash.label.substring(1)}',
+                    color: clash.sure ? AppPalette.terracotta : AppPalette.honey),
               for (final reason in widget.ranked.reasons) StatusPill(label: reason),
             ],
           ),

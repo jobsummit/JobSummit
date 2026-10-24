@@ -225,6 +225,9 @@ class _AgendaRow extends ConsumerWidget {
     final text = Theme.of(context).textTheme;
     final color = _colorFor(item, now);
     final sub = showDate ? '${item.at.day} ${_short[item.at.month - 1]} · ${item.subtitle}' : item.subtitle;
+    final clash = item.kind == AgendaKind.exam && item.app != null
+        ? ref.watch(examClashesProvider)[item.app!.id]?.firstOrNull
+        : null;
     return InkWell(
       onTap: () => _open(context, ref),
       child: Padding(
@@ -238,6 +241,12 @@ class _AgendaRow extends ConsumerWidget {
                   Text(item.title, style: text.titleSmall, maxLines: 2, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 2),
                   Text(sub, style: text.bodySmall, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  if (clash != null)
+                    Text('⚠️ ${clash.label}',
+                        style: text.labelSmall?.copyWith(
+                            color: clash.sure ? AppPalette.terracotta : AppPalette.honey, fontWeight: FontWeight.w800),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis),
                 ],
               ),
             ),
