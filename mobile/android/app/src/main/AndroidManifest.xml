@@ -11,6 +11,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- One-time "Allow background checks" (exam watcher every ~4 h). -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Android 9 and older only: saving a form photo / signature into Pictures/JobSummit. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
     <!-- In-app updater (direct flavour): packages/self_update declares its install
          permissions; src/store/AndroidManifest.xml removes them again. -->
@@ -61,6 +65,19 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+
+        <!-- Home-screen widget: next last day, next exam (SummitWidget.kt). -->
+        <receiver
+            android:name=".SummitWidget"
+            android:exported="false"
+            android:label="@string/app_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/summit_widget_info" />
+        </receiver>
 
         <meta-data android:name="flutterEmbedding" android:value="2" />
         <!-- Channel FCM uses when a message names none; matches FCM_ANDROID_CHANNEL_ID on the server. -->

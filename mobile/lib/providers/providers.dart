@@ -134,6 +134,7 @@ class TrackedAppsNotifier extends AsyncNotifier<List<TrackedApplication>> {
             ...timeline,
             if (advert != null) 'advertisement_no': advert,
             if (refund != null) 'fee_refund': refund,
+            if (item.job?.uploadsJson case final u? when u.isNotEmpty) 'uploads': u,
           }));
     }
     await reload();

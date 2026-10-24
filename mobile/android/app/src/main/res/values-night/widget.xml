@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dusk (dark mode) -->
+    <color name="widget_background">#281C30</color>
+    <color name="widget_accent">#C3A6FF</color>
+    <color name="widget_text">#F1E9F7</color>
+    <color name="widget_muted">#B9A9C6</color>
+</resources>

@@ -21,6 +21,7 @@ import '../utils/system_actions.dart';
 import 'app_card.dart';
 import 'app_icons.dart';
 import 'application_tracker_sheet.dart';
+import 'form_images_sheet.dart';
 import 'common.dart';
 import 'motion.dart';
 import 'pills.dart';
@@ -307,6 +308,16 @@ class JobDetails extends ConsumerWidget {
               ),
           ],
           for (final post in posts) _PostDetails(post: post, category: category, showName: posts.length > 1),
+          if (job != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => showFormImagesSheet(context,
+                    examName: item.examName, organization: item.organization, specs: job.uploads),
+                icon: const Icon(Icons.photo_camera_front_outlined, size: 18),
+                label: const Text('Photo & signature for this form'),
+              ),
+            ),
         ],
       ),
     );

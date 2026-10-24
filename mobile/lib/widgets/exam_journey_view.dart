@@ -16,11 +16,23 @@ import 'app_icons.dart';
 import 'credential_drawer.dart';
 import 'dashboard_check_sheet.dart';
 import 'exam_delivery_tracker.dart';
+import 'form_images_sheet.dart';
 import 'pills.dart';
 
 enum _SyncState { idle, syncing, done }
 
-enum _MenuAction { admitCardLive, examScheduled, examDone, backToApplied, notPaid, paid, feePaid, editLinks, delete }
+enum _MenuAction {
+  admitCardLive,
+  examScheduled,
+  examDone,
+  backToApplied,
+  notPaid,
+  paid,
+  feePaid,
+  photos,
+  editLinks,
+  delete
+}
 
 /// The Exam journey page's content (one tracked exam): where it is now and the
 /// one next step, its delivery-style track, your IDs, Candidate login + Official
@@ -104,6 +116,9 @@ class _ExamJourneyViewState extends ConsumerState<ExamJourneyView> {
         await notifier.setFee(app.id, notPaid: true);
       case _MenuAction.paid:
         await notifier.setFee(app.id, notPaid: false);
+      case _MenuAction.photos:
+        await showFormImagesSheet(context,
+            examName: app.examName, organization: app.organization, specs: app.uploadSpecs);
       case _MenuAction.feePaid:
         final amount = await showDialog<int?>(context: context, builder: (_) => _FeeDialog(initial: app.feePaid));
         if (amount == null) return; // cancelled
@@ -205,6 +220,7 @@ class _ExamJourneyViewState extends ConsumerState<ExamJourneyView> {
             const PopupMenuItem(value: _MenuAction.paid, child: Text('Fee is paid ✓'))
           else if (!app.examOver(widget.now) && app.displayStatus == TrackerStatus.applied)
             const PopupMenuItem(value: _MenuAction.notPaid, child: Text('Fee not paid yet')),
+          const PopupMenuItem(value: _MenuAction.photos, child: Text('Photo & signature')),
           const PopupMenuItem(value: _MenuAction.feePaid, child: Text('Fee paid…')),
           const PopupMenuItem(value: _MenuAction.editLinks, child: Text('Edit links')),
           const PopupMenuDivider(),

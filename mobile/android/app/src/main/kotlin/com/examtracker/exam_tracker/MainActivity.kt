@@ -45,6 +45,38 @@ class MainActivity : FlutterActivity() {
             result.success(null)
         }
 
+        // The home-screen widget's text changed (lib/services/home_widget.dart).
+        MethodChannel(messenger, "jobsummit/widget").setMethodCallHandler { call, result ->
+            if (call.method != "refresh") return@setMethodCallHandler result.notImplemented()
+            SummitWidget.refresh(this)
+            result.success(null)
+        }
+
+        // Photo / signature for an exam form (ImageMaker), off the main thread.
+        MethodChannel(messenger, "jobsummit/media").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "make", "save" -> Thread {
+                    try {
+                        val out: Any = if (call.method == "make") {
+                            ImageMaker.make(
+                                call.argument<String>("path")!!,
+                                call.argument<Int>("width"),
+                                call.argument<Int>("height"),
+                                call.argument<Int>("minKb"),
+                                call.argument<Int>("maxKb"),
+                            )
+                        } else {
+                            ImageMaker.save(this, call.argument<ByteArray>("bytes")!!, call.argument<String>("name")!!)
+                        }
+                        runOnUiThread { result.success(out) }
+                    } catch (e: Exception) {
+                        runOnUiThread { result.error("media", e.message, null) }
+                    }
+                }.start()
+                else -> result.notImplemented()
+            }
+        }
+
         // Short sound effects (res/raw/fx_*.wav, made by tool/make_sounds.py). Played as
         // UI sounds: they never take audio focus, so music keeps playing, and only when
         // the phone is on ring (silent and vibrate mean silent).

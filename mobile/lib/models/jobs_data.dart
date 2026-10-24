@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../domain/upload_specs.dart';
+
 /// Mirrors `jobs.json` from the data pipeline (backend/app/services/publish.py).
 /// Unknown fields are ignored, so the pipeline can add fields without breaking
 /// older app versions.
@@ -149,6 +151,7 @@ class PublishedJob {
     this.sameAs = const [],
     this.fees = const {},
     this.feeRefund,
+    this.uploadsJson = const [],
   });
 
   final String id;
@@ -185,6 +188,11 @@ class PublishedJob {
   /// The refund rule, if printed ("Rs 400 refunded on appearing in CBT-1").
   final String? feeRefund;
 
+  /// The form's photo / signature rules as published (see [uploadSpecsFrom]).
+  final List<dynamic> uploadsJson;
+
+  List<UploadSpec> get uploads => uploadSpecsFrom(uploadsJson);
+
   /// This job and the copies merged into it.
   Iterable<String> get ids => [id, ...sameAs];
 
@@ -207,6 +215,7 @@ class PublishedJob {
             if (e.value is num) e.key: (e.value as num).toInt(),
         },
         feeRefund: j['fee_refund'] as String?,
+        uploadsJson: j['uploads'] as List<dynamic>? ?? const [],
         posts: [
           for (final p in (j['posts'] as List<dynamic>? ?? const []))
             PublishedPost.fromJson(p as Map<String, dynamic>),

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../domain/exam_catalog.dart';
+import '../domain/upload_specs.dart';
 import 'exam_timeline.dart';
 import 'links.dart';
 
@@ -232,6 +233,9 @@ class TrackedApplication {
   /// The form is started but the fee isn't paid. An admit card or anything later
   /// found for it means it was finished after all.
   bool get feeUnpaid => notPaid && status == ApplicationStatus.applied && displayStatus == TrackerStatus.applied;
+
+  /// The form's photo / signature rules, saved from its notice when it was tracked.
+  List<UploadSpec> get uploadSpecs => uploadSpecsFrom(timelineRaw?['uploads']);
 
   /// Newest watcher notice of a kind ('admit_card', 'result', ...).
   ExamUpdate? latestUpdate(String milestone) {

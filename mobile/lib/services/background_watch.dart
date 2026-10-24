@@ -2,13 +2,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:workmanager/workmanager.dart';
 
+import '../domain/agenda.dart';
 import '../domain/exam_watcher.dart';
+import '../domain/widget_summary.dart';
 import 'auto_update.dart';
 import 'backup_service.dart';
 import 'calendar_sync_service.dart';
 import 'database_service.dart';
 import 'deadline_reminders.dart';
 import 'exam_watch_service.dart';
+import 'home_widget.dart';
 import 'notification_service.dart';
 import 'update_service.dart';
 
@@ -74,7 +77,11 @@ void watchCallbackDispatcher() {
     // Jobs that fit you and close soon: the morning summary.
     try {
       final now = DateTime.now();
-      await DeadlineReminders(db).sync(await loadOpenJobs(db, now: now), now: now);
+      final jobs = await loadOpenJobs(db, now: now);
+      await DeadlineReminders(db).sync(jobs, now: now);
+      // The home-screen widget: next last day, next exam.
+      final agenda = buildAgenda(tracked: await db.listApplications(), jobs: jobs, now: now);
+      await HomeWidget.write(widgetSummary(agenda, now));
     } catch (_) {}
     // Forms started but not paid: a reminder the day before they close.
     // ...and a form's correction window, the day it opens.

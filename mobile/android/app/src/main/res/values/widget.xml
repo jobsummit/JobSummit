@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_title">JobSummit</string>
+    <string name="widget_description">Your next last day and next exam</string>
+    <string name="widget_empty">Nothing due this week.</string>
+    <!-- Sea Glass (light mode) -->
+    <color name="widget_background">#F2FAF9</color>
+    <color name="widget_accent">#007190</color>
+    <color name="widget_text">#10343D</color>
+    <color name="widget_muted">#4F6B72</color>
+</resources>

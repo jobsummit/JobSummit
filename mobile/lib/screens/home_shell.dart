@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/env.dart';
 import '../domain/agenda.dart';
 import '../domain/relevance.dart';
+import '../domain/widget_summary.dart';
 import '../models/tracked_application.dart';
 import '../providers/account_providers.dart';
 import '../providers/agenda_providers.dart';
@@ -17,6 +18,7 @@ import '../providers/providers.dart';
 import '../services/auth_service.dart';
 import '../services/deadline_reminders.dart';
 import '../services/notification_service.dart';
+import '../services/home_widget.dart';
 import '../services/share_intake.dart';
 import '../theme/app_theme.dart';
 import '../utils/system_actions.dart';
@@ -208,6 +210,10 @@ class _AccountGateState extends ConsumerState<AccountGate> {
       }
     });
     ref.listenManual<List<RankedJob>>(rankedJobsProvider, (_, __) => _syncReminders());
+    // The home-screen widget follows the Agenda (unchanged text isn't written again).
+    ref.listenManual(agendaProvider, fireImmediately: true, (_, items) {
+      unawaited(HomeWidget.write(widgetSummary(items, DateTime.now())).catchError((_) {}));
+    });
     // Paid, or marked not paid: its form reminder follows.
     ref.listenManual(activeAppsProvider, (_, apps) {
       unawaited(FormReminders.sync(apps, now: DateTime.now()).catchError((_) => const <String>[]));
