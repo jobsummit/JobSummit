@@ -171,6 +171,8 @@ Rules:
   apprenticeship, fellowship (JRF/SRF), or internship.
 - `application_fees`: the fee table, one entry per category in rupees (UR for General; 0 for
   "exempted"/"nil"); one ALL entry when everyone pays the same. `fee_refund`: only if printed.
+- `upload_specs`: the photo / signature / left thumb / declaration rules (file size in KB,
+  dimensions) from the "how to fill the form" part; only what is printed.
 - Bilingual (Hindi/English) PDFs: use the English text.
 """
 
@@ -765,6 +767,7 @@ def normalize_extraction(raw: NotificationExtraction, *, tz: ZoneInfo) -> Parsed
         employment_type=_employment_type(raw.employment_type),
         fees=_fees(raw.application_fees),
         fee_refund=(raw.fee_refund or "").strip()[:300] or None,
+        uploads=_uploads(raw.upload_specs),
         review_notes=notes,
     )
 
@@ -774,6 +777,33 @@ _FEE_CATEGORIES = {
     "ST": "ST", "PWBD": "PWBD", "PWD": "PWBD", "PH": "PWBD", "WOMEN": "WOMEN", "FEMALE": "WOMEN",
     "EXSM": "EXSM", "ESM": "EXSM", "EX-SERVICEMEN": "EXSM", "ALL": "ALL",
 }  # fmt: skip
+
+
+_UPLOAD_KINDS = {"photo", "signature", "left_thumb", "declaration"}
+_PX_PER_CM = 100  # 3.5 x 4.5 cm -> 350 x 450 px: sharp enough, small enough for 50 KB
+
+
+def _uploads(raw: list | None) -> list[dict]:
+    """One rule per kind; sizes in pixels (cm become 100 px/cm); nonsense dropped."""
+    out: dict[str, dict] = {}
+    for u in raw or []:
+        kind = (u.kind or "").strip().lower().replace(" ", "_")
+        if kind not in _UPLOAD_KINDS or kind in out:
+            continue
+        w, h = u.width_px, u.height_px
+        if not (w and h) and u.width_cm and u.height_cm:
+            w, h = round(u.width_cm * _PX_PER_CM), round(u.height_cm * _PX_PER_CM)
+        lo, hi = u.min_kb, u.max_kb
+        if hi is not None and not 1 <= hi <= 5000:
+            hi = None
+        if lo is not None and not (0 <= lo <= 5000 and (hi is None or lo < hi)):
+            lo = None
+        if w is not None and h is not None and not (20 <= w <= 4000 and 20 <= h <= 4000):
+            w = h = None
+        if hi is None and w is None:
+            continue
+        out[kind] = {"kind": kind, "min_kb": lo, "max_kb": hi, "width": w, "height": h}
+    return list(out.values())
 
 
 def _fees(raw: list | None) -> dict[str, int]:

@@ -75,6 +75,7 @@ ADDED_COLUMNS = (
     "ALTER TYPE parser_key ADD VALUE IF NOT EXISTS 'wordpress_posts'",
     "ALTER TABLE job_posts ADD COLUMN IF NOT EXISTS fees JSONB",
     "ALTER TABLE job_posts ADD COLUMN IF NOT EXISTS fee_refund VARCHAR(300)",
+    "ALTER TABLE job_posts ADD COLUMN IF NOT EXISTS uploads JSONB",
 )
 
 

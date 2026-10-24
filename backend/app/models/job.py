@@ -35,6 +35,8 @@ class JobPost(UUIDPkMixin, TimestampMixin, Base):
     # Fee in rupees per category ({"UR": 500, "SC": 250}), and a refund rule if printed.
     fees: Mapped[dict | None] = mapped_column(JSONB)
     fee_refund: Mapped[str | None] = mapped_column(String(300))
+    # Photo / signature rules for the form (see ParsedNotification.uploads).
+    uploads: Mapped[list | None] = mapped_column(JSONB)
     application_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     application_deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     exam_date: Mapped[date | None]

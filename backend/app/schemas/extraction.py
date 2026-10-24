@@ -19,6 +19,16 @@ class ExtractedFee(BaseModel):
     amount: int = Field(description="Application fee in rupees for this category (0 if exempt)")
 
 
+class ExtractedUpload(BaseModel):
+    kind: str = Field(description="One of: photo, signature, left_thumb, declaration")
+    min_kb: int | None = Field(description="Smallest file size allowed, KB")
+    max_kb: int | None = Field(description="Largest file size allowed, KB")
+    width_px: int | None = Field(description="Width in pixels, if printed in pixels")
+    height_px: int | None = Field(description="Height in pixels, if printed in pixels")
+    width_cm: float | None = Field(description="Width in cm, if printed in cm or mm (convert mm to cm)")
+    height_cm: float | None = Field(description="Height in cm, if printed in cm or mm (convert mm to cm)")
+
+
 class ExtractedVacancy(BaseModel):
     ur: int | None = Field(description="Unreserved / General / UR / GEN seats")
     sc: int | None = Field(description="Scheduled Caste seats")
@@ -99,6 +109,10 @@ class NotificationExtraction(BaseModel):
     )
     fee_refund: str | None = Field(
         description="Fee refund rule if printed, short, e.g. 'Rs 400 refunded on appearing in CBT-1'"
+    )
+    upload_specs: list[ExtractedUpload] = Field(
+        description="Photo / signature / thumb impression / declaration file rules for the online form, "
+        "if printed; empty if not"
     )
     general_age_relaxations: list[ExtractedRelaxation]
     posts: list[ExtractedPost]

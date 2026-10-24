@@ -53,6 +53,7 @@ def _to_orm(
         employment_type=parsed.employment_type,
         fees=parsed.fees or None,
         fee_refund=parsed.fee_refund,
+        uploads=parsed.uploads or None,
         application_start=parsed.application_start,
         application_deadline=parsed.application_deadline,
         exam_date=parsed.exam_date,

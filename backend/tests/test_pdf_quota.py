@@ -46,6 +46,7 @@ EXTRACTION = {
     "employment_type": None,
     "application_fees": [],
     "fee_refund": None,
+    "upload_specs": [],
     "general_age_relaxations": [],
     "posts": [
         {

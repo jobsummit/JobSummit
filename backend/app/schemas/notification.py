@@ -65,6 +65,8 @@ class ParsedNotification(BaseModel):
     # Fee in rupees per category ("UR", "SC", ..., "ALL" when one fee for everyone).
     fees: dict[str, int] = Field(default_factory=dict)
     fee_refund: str | None = Field(None, max_length=300)
+    # Upload rules for the form: [{"kind": "photo", "min_kb": 20, "max_kb": 50, "width": 350, "height": 450}].
+    uploads: list[dict] = Field(default_factory=list)
     review_notes: list[str] = Field(default_factory=list)
     extraction_model: str | None = None  # the Gemini model that actually read it
 

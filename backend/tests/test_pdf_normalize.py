@@ -28,6 +28,7 @@ def _raw(**over) -> NotificationExtraction:
         "employment_type": None,
         "application_fees": [],
         "fee_refund": None,
+        "upload_specs": [],
         "general_age_relaxations": [
             {"category": "OBC (NCL)", "years": 3},
             {"category": "SC/ST", "years": 5},
@@ -88,6 +89,29 @@ def test_fees_are_kept_per_category_and_misreads_dropped():
     )
     assert n.fees == {"UR": 500, "SC": 250, "WOMEN": 250}
     assert n.fee_refund == "Rs 400 refunded on appearing in CBT-1"
+
+
+def test_upload_rules_become_pixels_and_nonsense_is_dropped():
+    def spec(kind, **k):
+        base = dict.fromkeys(["min_kb", "max_kb", "width_px", "height_px", "width_cm", "height_cm"])
+        return {"kind": kind, **base, **k}
+
+    n = normalize_extraction(
+        _raw(
+            upload_specs=[
+                spec("Photo", min_kb=20, max_kb=50, width_cm=3.5, height_cm=4.5),
+                spec("signature", min_kb=10, max_kb=20, width_px=140, height_px=60),
+                spec("left thumb", min_kb=80, max_kb=20),  # min above max: min dropped
+                spec("aadhaar", max_kb=100),  # not a form upload
+            ]
+        ),
+        tz=IST,
+    )
+    assert n.uploads == [
+        {"kind": "photo", "min_kb": 20, "max_kb": 50, "width": 350, "height": 450},
+        {"kind": "signature", "min_kb": 10, "max_kb": 20, "width": 140, "height": 60},
+        {"kind": "left_thumb", "min_kb": None, "max_kb": 20, "width": None, "height": None},
+    ]
 
 
 def test_seat_mismatch_flags_review():

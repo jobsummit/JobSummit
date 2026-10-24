@@ -141,6 +141,7 @@ def job_json(job: JobPost) -> dict[str, Any]:
         "employment_type": job.employment_type,
         "fees": job.fees or {},
         "fee_refund": job.fee_refund,
+        "uploads": job.uploads or [],
         "application_start": _iso(job.application_start),
         "application_deadline": _iso(job.application_deadline),
         "exam_date": _iso(job.exam_date),
