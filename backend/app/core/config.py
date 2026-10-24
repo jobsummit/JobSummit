@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     mistral_api_key: SecretStr = SecretStr("")
     mistral_models: str = "ministral-14b-latest,ministral-8b-latest,mistral-small-latest"
     mistral_timeout_s: int = 120
+    # The practice question bank: the first model writes, a different one answers
+    # each question blind (only agreed ones are kept). Big models: facts matter here.
+    practice_models: str = "mistral-large-latest,mistral-medium-latest,mistral-small-latest"
 
     # --- Uploads ------------------------------------------------------------
     upload_dir: Path = Path("/data/notifications")

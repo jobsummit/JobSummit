@@ -6,6 +6,7 @@
 #     jobs.json      open jobs with eligibility rules  -> the app's feed
 #     notices.json   admit card / exam date / answer key / result notices -> exam watcher
 #     status.json    what the last run did
+#     practice/      the practice tests' question bank, one file per section
 #     state/         database dump the next run continues from (which links are known)
 #
 # The app reads these files from GitHub Pages when it is switched on (Settings -> Pages ->
@@ -124,6 +125,23 @@ jobs:
             git show FETCH_HEAD:private_jobs.json > /tmp/previous_private_jobs.json 2>/dev/null || true
           fi
           python -m app.modules.private_jobs --out ../publish/private_jobs.json --previous /tmp/previous_private_jobs.json
+
+      # Practice tests' question bank (English, GK, science, computer, banking): a few
+      # Mistral-written questions a run, kept only when a second model agrees on the
+      # answer, up to 1000 a section. Starts from the published files, so a failed
+      # run publishes them unchanged.
+      - name: Practice questions
+        continue-on-error: true
+        timeout-minutes: 9
+        working-directory: backend
+        run: |
+          mkdir -p ../publish/practice
+          if git fetch -q --depth=1 origin data 2>/dev/null; then
+            for f in $(git ls-tree --name-only FETCH_HEAD practice/ 2>/dev/null); do
+              git show "FETCH_HEAD:$f" > "../publish/$f"
+            done
+          fi
+          python -m app.services.practice_bank --dir ../publish/practice
 
       - name: Save state
         run: |
