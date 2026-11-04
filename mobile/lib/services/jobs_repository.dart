@@ -32,16 +32,16 @@ class JobsRepository {
   static const _etagKey = 'jobs.etag';
 
   Future<JobsLoad?> cached() async {
-    final cached = await _db.readFeedCache();
-    if (cached == null) return null;
     try {
+      final cached = await _db.readFeedCache();
+      if (cached == null) return null;
       return JobsLoad(
         JobsFile.fromJson(jsonDecode(cached.$1) as Map<String, dynamic>),
         fetchedAt: cached.$2,
         fromCache: true,
       );
     } catch (_) {
-      return null; // a cache written by an older app version: refetch
+      return null; // unreadable or from an older app version: refetch
     }
   }
 

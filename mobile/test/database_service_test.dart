@@ -130,6 +130,12 @@ void main() {
     await db.cacheFeed('{"v":2}', now);
     expect((await db.readFeedCache())!.$1, '{"v":2}');
   });
+
+  test('feed cache bigger than one read piece comes back whole', () async {
+    final big = '{"s":"${'ab₹😀' * 200000}"}'; // 800k chars, multi-byte, several pieces
+    await db.cacheFeed(big, now);
+    expect((await db.readFeedCache())!.$1, big);
+  });
   test('timeline and exam-watcher state are stored per application', () async {
     await db.upsertApplication(app('a').copyWith());
     await db.upsertApplication(TrackedApplication(

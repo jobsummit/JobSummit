@@ -492,14 +492,24 @@ class DatabaseService {
   Future<void> touchFeedCache(DateTime at) =>
       _db.update('feed_cache', {'fetched_at': at.toUtc().millisecondsSinceEpoch}, where: 'id = 1');
 
+  /// Android reads at most ~2 MB of one row at a time (CursorWindow), and jobs.json
+  /// is bigger, so the body comes back in pieces.
   Future<(String body, DateTime fetchedAt)?> readFeedCache() async {
-    final rows = await _db.query('feed_cache', where: 'id = 1');
+    final rows = await _db.rawQuery('SELECT length(body) AS n, fetched_at FROM feed_cache WHERE id = 1');
     if (rows.isEmpty) return null;
+    final n = rows.first['n']! as int;
+    final body = StringBuffer();
+    for (var i = 1; i <= n; i += _feedPiece) {
+      final part = await _db.rawQuery('SELECT substr(body, ?, ?) AS p FROM feed_cache WHERE id = 1', [i, _feedPiece]);
+      body.write(part.first['p']! as String);
+    }
     return (
-      rows.first['body']! as String,
+      body.toString(),
       DateTime.fromMillisecondsSinceEpoch(rows.first['fetched_at']! as int, isUtc: true),
     );
   }
+
+  static const _feedPiece = 256 * 1024; // characters; at most 1 MB even at 4 bytes each
 
   // ---------------------------------------------------------------------------
   // job_decisions (swipe right = applied, left = not for me)
