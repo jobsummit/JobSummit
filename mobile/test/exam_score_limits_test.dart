@@ -68,6 +68,23 @@ void main() {
       expect((s.right, s.wrong), (1, 1));
     });
 
+    // From live sheets, as other readers of them describe: letters for the chosen
+    // option, "Section : X" labels, option texts that start with a number, a key
+    // with two right answers.
+    test('the forms live sheets use', () {
+      String q(int n, Set<int> keys, String chosen, {String status = 'Answered'}) => '''
+<div class="question-pnl"><table class="questionRowTbl"><tr><td>Q.$n</td><td>Text</td></tr>
+${[for (var o = 1; o <= 4; o++) '<tr><td class="${keys.contains(o) ? 'rightAns' : 'wrngAns'}">$o. ${o + 2}.5 m</td></tr>'].join()}
+</table><table class="menu-tbl"><td>Status :</td><td class="bold">$status</td>
+<td>Chosen Option :</td><td class="bold">$chosen</td></table></div>''';
+      final html = '<div class="section-lbl"><span class="bold">Section : Quantitative Aptitude</span></div>'
+          '${q(1, {2}, 'B')}${q(2, {3}, '3')}${q(3, {1, 2}, '2')}${q(4, {4}, '--', status: 'Not Visited')}'
+          '${q(5, {4}, 'C', status: 'Marked For Review')}';
+      final s = parseResponseSheet(html)!;
+      expect(s.sections.single.name, 'Quantitative Aptitude');
+      expect((s.right, s.wrong, s.skipped), (3, 1, 1));
+    });
+
     test('not a response sheet', () {
       expect(parseResponseSheet('<html><p>Login</p></html>'), isNull);
     });

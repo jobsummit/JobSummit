@@ -89,7 +89,6 @@ class SheetScore {
 final _panel = RegExp(r'''class\s*=\s*["']question-pnl["']''', caseSensitive: false);
 final _sectionLabel = RegExp(r'''class\s*=\s*["']section-lbl["'][^>]*>(.*?)</div>''', caseSensitive: false, dotAll: true);
 final _option = RegExp(r'''<td[^>]*class\s*=\s*["'](rightAns|wrngAns)["'][^>]*>(.*?)</td>''', caseSensitive: false, dotAll: true);
-final _leadingNumber = RegExp(r'^\s*([1-9])\s*[.)]');
 final _tags = RegExp(r'<[^>]+>');
 
 String _clean(String html) =>
@@ -108,21 +107,22 @@ SheetScore? parseResponseSheet(String html, {DateTime? at}) {
   final starts = [for (final m in _panel.allMatches(html)) m.start];
   if (starts.isEmpty) return null;
   final labels = [
-    for (final m in _sectionLabel.allMatches(html)) (m.start, _clean(m.group(1)!)),
+    // "Section : General Intelligence and Reasoning"
+    for (final m in _sectionLabel.allMatches(html))
+      (m.start, _clean(m.group(1)!).replaceFirst(RegExp(r'^section\s*:?\s*', caseSensitive: false), '')),
   ];
   final sections = <String, SheetSection>{};
   for (final (i, start) in starts.indexed) {
     final chunk = html.substring(start, i + 1 < starts.length ? starts[i + 1] : html.length);
     final options = _option.allMatches(chunk).toList();
     if (options.isEmpty) continue; // a typed-answer question: no options to mark
-    int? key;
-    for (final (j, o) in options.indexed) {
-      if (o.group(1)!.toLowerCase() == 'rightans') {
-        key = int.tryParse(_leadingNumber.firstMatch(_clean(o.group(2)!))?.group(1) ?? '') ?? j + 1;
-        break;
-      }
-    }
-    if (key == null) continue; // dropped from the key
+    // The key's answer by its place (an option's text can start with a number, "3.5 m").
+    // Two marked right: a changed key, where either counts.
+    final keys = {
+      for (final (j, o) in options.indexed)
+        if (o.group(1)!.toLowerCase() == 'rightans') j + 1,
+    };
+    if (keys.isEmpty) continue; // dropped from the key
     final status = (_field(chunk, 'Status') ?? '').toLowerCase();
     var chosenText = _field(chunk, 'Chosen Option') ?? '';
     // Some sheets give the chosen option's id: find which option has it.
@@ -131,15 +131,25 @@ SheetScore? parseResponseSheet(String html, {DateTime? at}) {
         if (_field(chunk, 'Option $n ID') == chosenText) chosenText = '$n';
       }
     }
-    final chosen = status.contains('not answered') || status.contains('not attempted') ? null : int.tryParse(chosenText);
+    final notAnswered = ['not answered', 'not attempted', 'not visited'].any(status.contains);
+    final chosen = notAnswered ? null : _optionNumber(chosenText, options.length);
     final name = labels.lastWhere((l) => l.$1 < start, orElse: () => (0, 'Questions')).$2;
     final s = sections[name] ?? SheetSection(name);
     sections[name] = chosen == null
         ? s._add(skipped: 1)
-        : (chosen == key ? s._add(right: 1) : s._add(wrong: 1));
+        : (keys.contains(chosen) ? s._add(right: 1) : s._add(wrong: 1));
   }
   if (sections.isEmpty) return null;
   return SheetScore(sections: sections.values.toList(), at: at ?? DateTime.now());
+}
+
+/// "2" or "B" -> 2; "--", empty or out of range -> null.
+int? _optionNumber(String raw, int count) {
+  final t = raw.trim();
+  final n = RegExp(r'^[1-9]$').hasMatch(t)
+      ? int.parse(t)
+      : (RegExp(r'^[A-Ha-h]$').hasMatch(t) ? t.toUpperCase().codeUnitAt(0) - 64 : null);
+  return n != null && n <= count ? n : null;
 }
 
 /// Marks for each section: the exam's pattern when its sections line up with
