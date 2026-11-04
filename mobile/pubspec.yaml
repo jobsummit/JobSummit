@@ -19,7 +19,7 @@ dependencies:
   sqflite: ^2.4.1
   path: ^1.9.0
   # Android Keystore-backed storage for portal passwords (never in SQLite)
-  flutter_secure_storage: ^9.2.4
+  flutter_secure_storage: ^10.3.4
 
   # System integration
   device_calendar: ^4.3.3
