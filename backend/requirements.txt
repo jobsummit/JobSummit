@@ -8,7 +8,7 @@ tenacity>=9.0,<10.0
 cryptography>=43,<50
 tzdata>=2024.2
 # Crawling
-httpx>=0.27,<1.0
+httpx>=0.28.1,<1.0
 beautifulsoup4>=4.12,<5.0
 lxml>=5.3
 # Gemini token protection: send only relevant PDF pages (AGPL-3.0; see pdf_slicer.py)
