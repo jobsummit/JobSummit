@@ -23,8 +23,8 @@ from sqlalchemy.orm import selectinload
 from app.domain.enums import ExamMilestone, ItemKind, ItemStatus
 from app.domain.qualifications import QualificationLevel
 from app.models import DiscoveredItem, JobPost, PostDetail
-from app.services.exam_watcher import classify_milestone
 from app.services.lifecycle import timeline_out
+from app.services.milestones import classify_milestone
 from app.services.scraper_service import SECTION_FLAG, is_job_site
 from app.services.streams import infer_requirement
 

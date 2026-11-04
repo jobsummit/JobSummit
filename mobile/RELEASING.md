@@ -66,8 +66,7 @@ git push origin main v0.4.1
 3. Creates the release.
 
 The `store` APK is attached to the workflow run as an artifact, not to the public release.
-Within 30 minutes the VM's cron (`sync_release_manifest.sh`) serves the new `latest.json` at
-`/api/v1/app/version`. Phones also fall back to the GitHub copy directly.
+Phones read `latest.json` from the GitHub release itself.
 
 **Forcing an update** (e.g. after an API change): set the repository variable
 `MIN_SUPPORTED_VERSION_CODE`. Installs below it get the update prompt without a "Later" button.

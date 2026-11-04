@@ -744,16 +744,6 @@ class SourceCrawler:
         self.settings = settings or get_settings()
 
     async def collect_links(self, source: Source) -> list[Link]:
-        if source.parser is ParserKey.TELEGRAM:
-            from app.services.telegram_service import collect_channel_links
-
-            links, cursor = await collect_channel_links(
-                self.fetcher, source.url, source.cursor, self.settings
-            )
-            if cursor:
-                source.cursor = cursor
-            return links
-
         parse = LIST_PARSERS.get(source.parser, parse_generic)
         res = await self.fetcher.get(source.url, max_bytes=self.settings.max_page_bytes)
         links = parse(res.body, res.url)

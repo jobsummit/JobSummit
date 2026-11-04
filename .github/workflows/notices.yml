@@ -36,10 +36,6 @@ jobs:
       MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY || '' }}
       MISTRAL_MODELS: ${{ vars.MISTRAL_MODELS || 'ministral-14b-latest,ministral-8b-latest,mistral-small-latest' }}
       UPLOAD_DIR: /tmp/notifications
-      # The server-only settings still need values to load the shared config.
-      API_KEY: not-used-in-pipeline
-      JWT_SECRET: not-used-in-the-pipeline-but-must-be-32-chars-long
-      GOOGLE_CLIENT_IDS: '[]'
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
