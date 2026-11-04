@@ -88,3 +88,40 @@ def test_mistral_failing_leaves_them_for_the_next_run(monkeypatch):
     monkeypatch.setattr(notice_labels, "_retryable", lambda exc: False)
     assert asyncio.run(notice_labels.label_notices(notices, {}, client=client)) == 0
     assert "about" not in notices[0]
+
+
+def test_a_label_needs_the_exams_board_in_the_title(monkeypatch):
+    """NTPC Limited (the power company) is not RRB NTPC: Mistral labelled its
+    "Assistant Officer" admit card as RRB NTPC Graduate."""
+    monkeypatch.setattr(get_settings(), "mistral_api_key", SecretStr("test-key"))
+    catalog = notice_labels.load_catalog()
+    by_id = {e["id"]: e for e in catalog}
+    named = notice_labels.board_named
+    assert not named("NTPC Assistant Officer Admit Card 2026", by_id["rrb-ntpc-graduate"])
+    assert named("RRB NTPC Graduate Level CBTST Admit Card 2026", by_id["rrb-ntpc-graduate"])
+    assert named("Railway NTPC Graduate CBT 2 Result", by_id["rrb-ntpc-graduate"])
+    assert named("Staff Selection Commission CGL Tier 1 Result", by_id["ssc-cgl"])
+    assert named("IBPS PO XVI Mains Admit Card", by_id["ibps-po"])
+    assert not named("Bank of Baroda PO Admit Card", by_id["ibps-po"])
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        labels = [{"i": 0, "exam": "rrb-ntpc-graduate", "year": "2026"}]
+        return httpx.Response(
+            200, json={"choices": [{"message": {"content": json.dumps({"labels": labels})}}]}
+        )
+
+    notices = _notices("NTPC Assistant Officer Admit Card 2026", "RRB NTPC Graduate CBTST Result 2026")
+    known = {"https://agg.example/1": {"exam": "rrb-ntpc-graduate", "stage": "skill"}}
+    client = httpx.AsyncClient(transport=httpx.MockTransport(answer))
+    asyncio.run(notice_labels.label_notices(notices, known, catalog=catalog, client=client))
+    assert notices[0]["about"]["exam"] is None
+    assert notices[0]["about"]["year"] == "2026"
+    assert notices[1]["about"]["exam"] == "rrb-ntpc-graduate"
+
+
+def test_a_wrong_label_from_the_last_file_is_dropped_too():
+    catalog = notice_labels.load_catalog()
+    notices = _notices("NTPC Assistant Officer Admit Card 2026")
+    known = {"https://agg.example/0": {"exam": "rrb-ntpc-graduate", "year": "2026"}}
+    asyncio.run(notice_labels.label_notices(notices, known, catalog=catalog))
+    assert notices[0]["about"] == {"exam": None, "year": "2026"}

@@ -91,6 +91,32 @@ void main() {
       expect(foundLabelled(grad, [older]), isEmpty);
     });
 
+    // Reported 4 Nov 2026: NTPC Limited (the power company) is not RRB NTPC.
+    test('a label still needs the exam’s board in the notice', () {
+      const ntpcLtd = ('NTPC Assistant Officer Admit Card 2026', NoticeAbout(exam: 'rrb-ntpc-graduate', year: '2026'));
+      expect(foundLabelled(grad, [ntpcLtd]), isEmpty);
+      const railway = ('Railway NTPC Graduate CBT-1 Admit Card 2026',
+          NoticeAbout(exam: 'rrb-ntpc-graduate', year: '2026', stage: 'cbt-1'));
+      expect(foundLabelled(grad, [railway]), hasLength(1));
+      final stored = ExamUpdate(
+        milestone: 'admit_card',
+        title: 'NTPC Assistant Officer Admit Card 2026',
+        url: 'https://www.sarkariresult.com.cm/ntpc-assistant-officer-admit-card-2026/',
+        detectedAt: DateTime.utc(2026, 10, 28),
+        examId: 'rrb-ntpc-graduate',
+      );
+      expect(isStrayUpdate(grad, stored), isTrue, reason: 'already on a phone: it comes off');
+    });
+
+    test('other boards’ look-alikes', () {
+      final bankSo = manual('SBI SO 2026', 'State Bank of India', const []);
+      expect(labelNamesBoard('Indian Bank Specialist Officer SO Result 2026', bankSo.catalogExam!, null), isFalse);
+      final steno = manual('SSC Stenographer 2026', 'Staff Selection Commission', const []);
+      expect(labelNamesBoard('UPSSSC Stenographer Skill Test Result 2026', steno.catalogExam!, null), isFalse);
+      final vayu = manual('Agniveervayu 2027', 'Indian Air Force', const []);
+      expect(labelNamesBoard('Indian Airforce Agniveer Vayu Intake 02/2027 Answer Key', vayu.catalogExam!, null), isTrue);
+    });
+
     test('a stored notice labelled as another exam comes off', () {
       final stored = ExamUpdate(
         milestone: 'admit_card',

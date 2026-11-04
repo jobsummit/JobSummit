@@ -394,6 +394,40 @@ bool _namesBoard(String text, CatalogExam exam, String? organization) {
   return false;
 }
 
+/// A board's own words for its recruitments: RRB's "CEN" (Centralised
+/// Employment Notice), IBPS's "CRP" (Common Recruitment Process).
+const _boardMarks = {
+  'Railway Recruitment Boards': {'cen', 'rrc'},
+  'Institute of Banking Personnel Selection': {'crp'},
+};
+
+const _genericBoardWords = {
+  'recruitment', 'board', 'boards', 'commission', 'selection', 'service', 'services', 'institute', 'of', //
+  'personnel', 'national', 'india', 'indian', 'union', 'public', 'state', 'bank', 'corporation', 'limited',
+  'the', 'and', 'for',
+};
+
+/// A notice Mistral labelled as [exam] still has to name its board, in any
+/// form: "RRB", "Railway", the board's initials, a long name run together
+/// ("Airforce"). Mistral took NTPC Limited's (the power company's) "Assistant
+/// Officer" admit card for RRB NTPC. Short codes must stand alone: SSC is inside
+/// "UPSSSC", another board.
+bool labelNamesBoard(String text, CatalogExam exam, String? organization) {
+  if (_namesBoard(text, exam, organization)) return true;
+  final words = {for (final m in RegExp('[a-z0-9]+').allMatches(text.toLowerCase())) m[0]!};
+  if ((_boardMarks[exam.board] ?? const {}).any(words.contains)) return true;
+  final board = [for (final m in RegExp('[a-z]+').allMatches(exam.board.toLowerCase())) m[0]!];
+  String stem(String w) => w.endsWith('s') ? w.substring(0, w.length - 1) : w;
+  final stems = {for (final w in board) if (!_genericBoardWords.contains(w)) stem(w)};
+  if (words.any((w) => stems.contains(stem(w)))) return true;
+  final joined = text.toLowerCase().replaceAll(RegExp('[^a-z0-9]'), '');
+  final long = [
+    exam.name.split(' ').first.toLowerCase().replaceAll(RegExp('[^a-z0-9]'), ''),
+    board.where((w) => !_genericBoardWords.contains(w)).join(),
+  ];
+  return long.any((n) => n.length >= 6 && joined.contains(n));
+}
+
 const _romanStage = {'i': '1', 'ii': '2', 'iii': '3', 'iv': '4', 'v': '5'};
 
 /// "tier-1", "cbt-2", "prelims", "mains", "interview", or null when none is named.
@@ -685,11 +719,13 @@ List<DetectedUpdate> detectUpdates(
     if (!thisRound.admits(about, milestone, link.publishedAt ?? at)) continue;
     if (namesAnotherStage(text, stage)) continue; // a Tier 1 notice for an exam tracked at Tier-2
     if (label != null && _labelSaysOtherStage(label, stage)) continue;
-    // Mistral's reading decides which exam when it names one of the list.
+    // Mistral's reading decides which exam when it names one of the list, as long
+    // as the notice names that exam's board (off the board's own pages).
     final labelled = label?.exam != null && mine != null;
     if (labelled && label!.exam != mine.id) continue;
-    // A job site's page is always about many exams: it has to name this one.
     final jobSite = isJobSite(url);
+    if (labelled && (jobSite || !boardsOwnPage) && !labelNamesBoard(about, mine, organization)) continue;
+    // A job site's page is always about many exams: it has to name this one.
     if (!labelled &&
         (!examSpecificPage || jobSite) &&
         !_namesExam(about, examName, organization, boardsPage: boardsOwnPage && !jobSite)) {
@@ -746,6 +782,7 @@ bool isStrayUpdate(TrackedApplication app, ExamUpdate u, {ExamRound? round}) {
   final mine = app.catalogExam;
   if (labelled != null && mine != null) {
     if (labelled != mine.id) return true;
+    if (isJobSite(u.url) && !labelNamesBoard(u.title, mine, app.organization)) return true;
   } else if (isJobSite(u.url) && !_namesExam(u.title, app.examName, app.organization)) {
     return true;
   }

@@ -83,6 +83,8 @@ SYSTEM = (
     "when it is none of them or you are not sure. Be strict: Graduate and Undergraduate (10+2, UG) are "
     "different exams; IBPS Clerk (CSA) and IBPS RRB Office Assistant are different; a board's other "
     "recruitments (Junior Translator, Ministerial, Section Controller...) are none of them unless listed. "
+    "The exam must be run by the listed board: NTPC Limited (the power company) is not RRB NTPC, and a "
+    "state bank's or PSU's own recruitment is not IBPS or SBI's. "
     'Also give, when the title prints them: the advertisement number ("CEN 06/2025", '
     '"CRPD/CR/2026-27/17"), the year of the recruitment round, the IBPS-style round numeral ("XV"), '
     "and the stage the notice is about, one of: " + ", ".join(STAGES) + ". CBTST, CBAT and typing tests "
@@ -101,11 +103,47 @@ def _exam_list(catalog: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+# Board words too common to tell boards apart.
+_GENERIC = {
+    "recruitment", "board", "boards", "commission", "selection", "service", "services", "institute", "of",
+    "personnel", "national", "india", "indian", "union", "public", "state", "bank", "corporation", "limited",
+    "the", "and", "for",
+}  # fmt: skip
+
+
+# A board's own words for its recruitments: RRB's "CEN", IBPS's "CRP".
+_MARKS = {"Railway Recruitment Boards": {"cen", "rrc"}, "Institute of Banking Personnel Selection": {"crp"}}
+
+
+def board_named(title: str, exam: dict[str, Any]) -> bool:
+    """The title names the exam's board: its code ("RRB", "SSC"), its initials, or a
+    word of its name that tells it apart ("Railway"). "NTPC Assistant Officer"
+    names none of RRB NTPC's."""
+    words = set(re.findall(r"[a-z0-9]+", title.lower()))
+    code = exam["name"].split()[0].lower()
+    board = re.findall(r"[a-z]+", exam["board"].lower())
+    initials = "".join(w[0] for w in board if w not in {"of", "the", "and", "for"})
+    stems = {w.rstrip("s") for w in board if w not in _GENERIC}
+    # Long names run together ("Airforce", "AgniveerVayu"); short codes never are
+    # (SSC is inside "UPSSSC", which is another board).
+    joined = re.sub(r"[^a-z0-9]", "", title.lower())
+    long_names = [re.sub(r"[^a-z0-9]", "", code), "".join(w for w in board if w not in _GENERIC)]
+    return (
+        code in words
+        or bool(_MARKS.get(exam["board"], set()) & words)
+        or (len(initials) >= 2 and initials in words)
+        or any(w.rstrip("s") in stems for w in words)
+        or any(len(n) >= 6 and n in joined for n in long_names)
+    )
+
+
 def _squash(s: str) -> str:
     return re.sub(r"[^a-z0-9]", "", s.lower())
 
 
-def _clean(raw: Any, ids: set[str], title: str = "") -> dict[str, Any] | None:
+def _clean(
+    raw: Any, ids: set[str], title: str = "", catalog: dict[str, dict[str, Any]] | None = None
+) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None
 
@@ -124,6 +162,8 @@ def _clean(raw: Any, ids: set[str], title: str = "") -> dict[str, Any] | None:
     # one would hide the notice from the exam it is about.
     if advert and _squash(advert) not in _squash(title):
         advert = None
+    if exam in ids and catalog and exam in catalog and not board_named(title, catalog[exam]):
+        exam = None  # another organisation's exam of the same name ("NTPC" Limited for RRB NTPC)
     return {
         "exam": exam if exam in ids else None,
         "advert": advert,
@@ -187,17 +227,21 @@ async def label_notices(
     """Puts ``about`` on each notice: the label the last file had, else Mistral's.
     Returns how many requests were sent. Without a Mistral key, or when Mistral
     fails, notices go without (the app then falls back to its word rules)."""
+    catalog = catalog if catalog is not None else load_catalog()
+    by_id = {e["id"]: e for e in catalog}
     for n in notices:
         if n["url"] in known:
             about = dict(known[n["url"]])
             if about.get("advert") and _squash(about["advert"]) not in _squash(n["title"]):
                 about["advert"] = None  # labelled before guesses were dropped
+            exam = by_id.get(about.get("exam") or "")
+            if exam and not board_named(n["title"], exam):
+                about["exam"] = None  # labelled before the board had to be named
             n["about"] = about
     todo = [n for n in notices if "about" not in n]
     if not todo or not mistral_reader.configured():
         return 0
-    catalog = catalog if catalog is not None else load_catalog()
-    ids = {e["id"] for e in catalog}
+    ids = set(by_id)
     exam_list = _exam_list(catalog)
     own = client is None
     http = client or httpx.AsyncClient(timeout=get_settings().mistral_timeout_s)
@@ -214,7 +258,7 @@ async def label_notices(
             for raw in answers:
                 i = raw.get("i") if isinstance(raw, dict) else None
                 if isinstance(i, int) and 0 <= i < len(batch):
-                    label = _clean(raw, ids, batch[i]["title"])
+                    label = _clean(raw, ids, batch[i]["title"], by_id)
                     if label is not None:
                         batch[i]["about"] = label
     finally:
