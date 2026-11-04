@@ -117,6 +117,15 @@ void main() {
       expect(labelNamesBoard('Indian Airforce Agniveer Vayu Intake 02/2027 Answer Key', vayu.catalogExam!, null), isTrue);
     });
 
+    test('an everyday first word needs the next one', () {
+      final post = manual('India Post GDS 2026', 'India Post', const []);
+      expect(labelNamesBoard('Bank of India Clerk Result 2026', post.catalogExam!, null), isFalse);
+      expect(labelNamesBoard('India Post GDS Merit List 2026', post.catalogExam!, null), isTrue);
+      final police = manual('Delhi Police Constable 2026', 'Staff Selection Commission', const []);
+      expect(labelNamesBoard('Delhi Police Constable Exam Date 2026', police.catalogExam!, null), isTrue);
+      expect(labelNamesBoard('Delhi University Non Teaching Result', police.catalogExam!, null), isFalse);
+    });
+
     test('a stored notice labelled as another exam comes off', () {
       final stored = ExamUpdate(
         milestone: 'admit_card',

@@ -46,6 +46,7 @@ BackupSnapshot snap({
     );
 
 void main() {
+  progressTests();
   final t1 = DateTime.utc(2026, 10, 10);
   final t2 = DateTime.utc(2026, 10, 12);
   final t3 = DateTime.utc(2026, 10, 14);
@@ -192,5 +193,46 @@ void main() {
     final round = BackupSnapshot.fromJson(jsonDecode(jsonEncode(m.toJson())) as Map<String, dynamic>);
     expect(round.decisions['j1']?['title'], 'PO');
     expect(round.jobPreferences?['preferred'], ['psu']);
+  });
+}
+
+void progressTests() {
+  test('practice and XP: nothing either phone had is lost', () {
+    Map<String, Object?> test(String at, int right) => {'k': 'quant', 'at': at, 'n': 10, 'r': right, 'w': 0, 's': 60};
+    Map<String, Object?> card(String id, String text, int misses) => {
+          'q': {'id': id, 's': 'quant', 'q': text, 't': 'Ages', 'o': ['1', '2', '3', '4'], 'a': 0},
+          'step': 0,
+          'due': '2026-10-21T00:00:00.000',
+          'm': misses,
+        };
+    final local = BackupSnapshot(savedAt: now, deviceId: 'a', progress: {
+      'practice.history': [test('2026-10-02T09:00:00.000', 7)],
+      'practice.mistakes': [card('gen-quant-0-1', 'How old?', 2)],
+      'limits.attempts': {'upsc-cse': 2},
+      'xp.state': {'xp': 120},
+    });
+    final remote = BackupSnapshot(savedAt: now, deviceId: 'b', progress: {
+      'practice.history': [test('2026-10-01T09:00:00.000', 5), test('2026-10-02T09:00:00.000', 7)],
+      'practice.mistakes': [card('gen-quant-3-9', 'How old?', 1), card('bank-1', 'Synonym?', 1)],
+      'limits.attempts': {'upsc-cse': 3, 'sbi-po': 1},
+      'xp.state': {'xp': 90},
+    });
+    final m = mergeSnapshots(local, remote, now: now).progress;
+    expect([for (final t in m['practice.history']! as List) (t as Map)['at']],
+        ['2026-10-01T09:00:00.000', '2026-10-02T09:00:00.000']);
+    final cards = m['practice.mistakes']! as List;
+    expect(cards, hasLength(2)); // the same made question once, this phone's copy
+    expect(cards.any((c) => (c as Map)['m'] == 2), isTrue);
+    expect(m['limits.attempts'], {'upsc-cse': 3, 'sbi-po': 1});
+    expect(m['xp.state'], {'xp': 120});
+    final back = BackupSnapshot.fromJson(jsonDecode(jsonEncode(BackupSnapshot(savedAt: now, deviceId: 'a', progress: m).toJson()))
+        as Map<String, dynamic>);
+    expect(back.progress['limits.attempts'], {'upsc-cse': 3, 'sbi-po': 1});
+  });
+
+  test('an older backup without progress keeps this phone’s', () {
+    final local = BackupSnapshot(savedAt: now, deviceId: 'a', progress: {'xp.state': {'xp': 40}});
+    final m = mergeSnapshots(local, BackupSnapshot(savedAt: now, deviceId: 'b'), now: now);
+    expect(m.progress, {'xp.state': {'xp': 40}});
   });
 }

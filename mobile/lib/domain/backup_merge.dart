@@ -95,7 +95,48 @@ BackupSnapshot mergeSnapshots(BackupSnapshot local, BackupSnapshot remote, {requ
     tombstones: tombstones,
     decisions: decisions,
     jobPreferences: remotePrefsNewer ? rp : lp,
+    progress: mergeProgress(local.progress, remote.progress),
   );
+}
+
+/// Practice and XP from both copies, nothing lost: every test either phone
+/// took, every mistake card (this phone's copy when both have one), the higher
+/// attempts count per exam, and the bigger XP.
+Map<String, Object?> mergeProgress(Map<String, Object?> local, Map<String, Object?> remote) {
+  List<Map<String, dynamic>> list(Map<String, Object?> side, String key) =>
+      [for (final e in (side[key] is List ? side[key] as List : const [])) if (e is Map<String, dynamic>) e];
+  final out = <String, Object?>{};
+
+  final tests = {
+    for (final r in [...list(remote, 'practice.history'), ...list(local, 'practice.history')]) '${r['k']}|${r['at']}': r,
+  }.values.toList()
+    ..sort((a, b) => '${a['at']}'.compareTo('${b['at']}'));
+  if (tests.isNotEmpty) out['practice.history'] = tests.length > 200 ? tests.sublist(tests.length - 200) : tests;
+
+  String cardKey(Map<String, dynamic> c) {
+    final q = c['q'] is Map ? c['q'] as Map : const {};
+    final id = '${q['id']}';
+    return id.startsWith('gen-') ? '${q['s']}:${q['q']}' : id; // made questions: by their words
+  }
+
+  final cards = {
+    for (final c in [...list(remote, 'practice.mistakes'), ...list(local, 'practice.mistakes')]) cardKey(c): c,
+  }.values.toList();
+  if (cards.isNotEmpty) out['practice.mistakes'] = cards.length > 300 ? cards.sublist(cards.length - 300) : cards;
+
+  final attempts = <String, Object?>{};
+  for (final side in [remote['limits.attempts'], local['limits.attempts']]) {
+    if (side is! Map) continue;
+    side.forEach((k, v) {
+      if (v is num && (attempts[k] is! num || v > (attempts[k] as num))) attempts['$k'] = v;
+    });
+  }
+  if (attempts.isNotEmpty) out['limits.attempts'] = attempts;
+
+  num xp(Object? s) => s is Map && s['xp'] is num ? s['xp'] as num : -1;
+  final l = local['xp.state'], r = remote['xp.state'];
+  if (l != null || r != null) out['xp.state'] = xp(r) > xp(l) ? r : l;
+  return out;
 }
 
 Map<String, Object?> _mergeApplication(Map<String, Object?> a, Map<String, Object?> b) {

@@ -10,6 +10,9 @@ import '../services/backup_service.dart';
 import '../services/drive_backup_client.dart';
 import 'account_providers.dart';
 import 'jobs_providers.dart';
+import 'limits_providers.dart';
+import 'practice_providers.dart';
+import 'xp_providers.dart';
 import 'providers.dart';
 
 enum BackupPhase {
@@ -162,7 +165,12 @@ class BackupController extends Notifier<BackupState> {
     if (outcome.profileRestored) ref.invalidate(profileProvider);
     ref
       ..invalidate(decisionsProvider)
-      ..invalidate(jobPreferencesProvider);
+      ..invalidate(jobPreferencesProvider)
+      // Practice and XP may have come from another phone.
+      ..invalidate(practiceHistoryProvider)
+      ..invalidate(mistakesProvider)
+      ..invalidate(attemptsUsedProvider)
+      ..invalidate(xpProvider);
     final db = ref.read(databaseProvider);
     for (final id in outcome.calendarWanted) {
       final app = await db.getApplication(id);

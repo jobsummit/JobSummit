@@ -7,6 +7,7 @@ import '../domain/practice.dart';
 import '../domain/practice_maker.dart';
 import '../services/practice_bank.dart';
 import '../services/practice_store.dart';
+import 'backup_providers.dart';
 
 final practiceBankProvider = Provider<PracticeBank>((ref) => PracticeBank());
 
@@ -17,6 +18,7 @@ class PracticeHistoryNotifier extends AsyncNotifier<List<PracticeResult>> {
 
   Future<void> add(PracticeResult result) async {
     state = AsyncData(await PracticeStore.add(result));
+    ref.read(backupControllerProvider.notifier).markDirty();
   }
 }
 
@@ -33,6 +35,7 @@ class MistakesNotifier extends AsyncNotifier<List<MistakeCard>> {
     final next = updateMistakes(await future, questions, chosen, now: DateTime.now(), review: review);
     await PracticeStore.saveMistakes(next);
     state = AsyncData(next);
+    ref.read(backupControllerProvider.notifier).markDirty();
   }
 }
 

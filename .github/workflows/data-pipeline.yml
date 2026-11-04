@@ -44,7 +44,8 @@ jobs:
     # Pinned: ubuntu-latest moves to a new release in Oct 2026, and this job relies on the
     # image's preinstalled PostgreSQL.
     runs-on: ubuntu-24.04
-    timeout-minutes: 50
+    # Above the steps' own limits added up (crawl 36 + private 10 + practice 9 + picks 6).
+    timeout-minutes: 65
     env:
       DATABASE_URL: postgresql+asyncpg://tracker:tracker@localhost:5432/tracker
       PGURL: postgresql://tracker:tracker@localhost:5432/tracker

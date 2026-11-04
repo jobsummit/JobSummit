@@ -5,7 +5,7 @@
 build/
 *.iml
 .idea/
-android/.gradle/
+.gradle/
 android/local.properties
 android/key.properties
 *.jks

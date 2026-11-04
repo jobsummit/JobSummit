@@ -8,6 +8,7 @@ import '../domain/xp.dart';
 import '../models/user_profile.dart';
 import '../services/database_service.dart';
 import '../services/profile_store.dart';
+import 'backup_providers.dart';
 import 'providers.dart';
 
 /// What just happened, for the "+20 XP" pop and the level-up moment.
@@ -67,6 +68,9 @@ class XpNotifier extends Notifier<XpState> {
     try {
       await (await SharedPreferences.getInstance()).setString(_key, jsonEncode(state.toJson()));
     } catch (_) {}
+    try {
+      ref.read(backupControllerProvider.notifier).markDirty();
+    } catch (_) {} // no backup in tests
   }
 
   /// Gives the points for [action] (nothing past its daily cap, nothing for a [key]

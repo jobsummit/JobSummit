@@ -7,6 +7,7 @@ import '../domain/exam_catalog.dart';
 import '../domain/exam_limits.dart';
 import '../models/jobs_data.dart';
 import 'account_providers.dart';
+import 'backup_providers.dart';
 import 'providers.dart';
 
 /// Attempts you've used, per exam (exam list id), as you set them.
@@ -30,6 +31,7 @@ class AttemptsNotifier extends AsyncNotifier<Map<String, int>> {
     try {
       await (await SharedPreferences.getInstance()).setString(_key, jsonEncode(next));
     } catch (_) {}
+    ref.read(backupControllerProvider.notifier).markDirty();
   }
 }
 

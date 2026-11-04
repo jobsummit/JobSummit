@@ -125,3 +125,12 @@ def test_a_wrong_label_from_the_last_file_is_dropped_too():
     known = {"https://agg.example/0": {"exam": "rrb-ntpc-graduate", "year": "2026"}}
     asyncio.run(notice_labels.label_notices(notices, known, catalog=catalog))
     assert notices[0]["about"] == {"exam": None, "year": "2026"}
+
+
+def test_an_everyday_first_word_needs_the_next_one():
+    by_id = {e["id"]: e for e in notice_labels.load_catalog()}
+    named = notice_labels.board_named
+    assert not named("Bank of India Clerk Result 2026", by_id["india-post-gds"])
+    assert named("India Post GDS Result 2026 Merit List", by_id["india-post-gds"])
+    assert named("Delhi Police Constable Exam Date 2026", by_id["delhi-police-constable"])
+    assert not named("Delhi University Non Teaching Result", by_id["delhi-police-constable"])

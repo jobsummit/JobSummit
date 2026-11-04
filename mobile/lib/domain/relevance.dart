@@ -284,7 +284,8 @@ RankedJob rankJob(FeedItem item, JobPreferences prefs, Affinity affinity,
   }
   if (crowd != null && !crowd.isEmpty) {
     final features = {...jobFeatures(item), if (track != null) 'track:$track'};
-    score += kCrowdShare * crowd.score(features);
+    // Capped: below your own picks (+3), so fake shared choices can't take over.
+    score += (kCrowdShare * crowd.score(features)).clamp(-1.5, 1.5);
     if (crowd.strongestLike(features) != null && !reasons.contains('Like jobs you applied to')) {
       reasons.add('Popular with people like you');
     }

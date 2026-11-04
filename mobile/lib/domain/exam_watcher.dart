@@ -381,11 +381,22 @@ bool _namesExam(String text, String examName, String? organization, {bool boards
   return alertMatchesExam(text, examName, organization);
 }
 
+/// The exam's code, the first word of its name ("RRB", "SSC"). When that word
+/// is an everyday one ("India Post", "Delhi Police"), its first two words
+/// together: "Bank of India" is not India Post.
+bool _namesCode(String text, CatalogExam exam) {
+  final name = exam.name.toLowerCase().split(' ');
+  final t = ' ${text.toLowerCase().replaceAll(RegExp('[^a-z0-9]+'), ' ')} ';
+  final code = name.first;
+  return _everydayCodes.contains(code) ? t.contains(' ${name.take(2).join(' ')} ') : t.contains(' $code ');
+}
+
+const _everydayCodes = {'india', 'indian', 'delhi', 'army', 'navy', 'state', 'national', 'union'};
+
 /// "IBPS", "Railway Recruitment Board", "RRB": the notice names the exam's board.
 bool _namesBoard(String text, CatalogExam exam, String? organization) {
   final words = _tokens(text).union({for (final m in RegExp('[a-z0-9]+').allMatches(text.toLowerCase())) m[0]!});
-  final code = exam.name.split(' ').first.toLowerCase();
-  if (words.contains(code)) return true;
+  if (_namesCode(text, exam)) return true;
   for (final name in [exam.board, if (organization != null) organization]) {
     if (_acronyms(name).any(words.contains)) return true;
     final named = _tokens(name);

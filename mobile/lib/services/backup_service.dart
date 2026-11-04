@@ -139,7 +139,21 @@ class BackupService {
         final p when p.savedAt != null => p.toJson(),
         _ => null,
       },
+      progress: await _readProgress(),
     );
+  }
+
+  static Future<Map<String, Object?>> _readProgress() async {
+    final prefs = await SharedPreferences.getInstance();
+    final out = <String, Object?>{};
+    for (final key in kProgressKeys) {
+      final raw = prefs.getString(key);
+      if (raw == null) continue;
+      try {
+        out[key] = jsonDecode(raw);
+      } catch (_) {} // unreadable: left out, never spread to other phones
+    }
+    return out;
   }
 
   /// [replaceLocal]: "start fresh from this account's backup" — this phone's data
@@ -165,6 +179,7 @@ class BackupService {
             tombstones: local.tombstones,
             decisions: local.decisions,
             jobPreferences: local.jobPreferences,
+            progress: local.progress,
           )
         : mergeSnapshots(local, remote, now: at);
 
@@ -223,6 +238,11 @@ class BackupService {
     final prefs = merged.jobPreferences;
     if (prefs != null && jsonEncode(prefs) != jsonEncode(local.jobPreferences)) {
       await JobPreferencesStore.write(JobPreferences.fromJson(prefs));
+    }
+    final store = await SharedPreferences.getInstance();
+    for (final e in merged.progress.entries) {
+      final json = jsonEncode(e.value);
+      if (json != jsonEncode(local.progress[e.key])) await store.setString(e.key, json);
     }
 
     return BackupOutcome(

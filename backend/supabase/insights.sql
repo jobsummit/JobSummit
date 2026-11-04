@@ -46,11 +46,16 @@ create table if not exists insights.exams (
   install_id  uuid not null references insights.installs (id) on delete cascade,
   exam_id     text,            -- the app's exam list id, when known
   exam_name   text not null,
-  stage       text,
+  stage       text not null default '',
   status      text,
   from_feed   boolean,
-  primary key (install_id, exam_name)
+  primary key (install_id, exam_name, stage)
 );
+-- Tables made by the first version keyed only (install_id, exam_name).
+update insights.exams set stage = '' where stage is null;
+alter table insights.exams alter column stage set default '', alter column stage set not null;
+alter table insights.exams drop constraint if exists exams_pkey;
+alter table insights.exams add primary key (install_id, exam_name, stage);
 
 create table if not exists insights.decisions (
   install_id  uuid not null references insights.installs (id) on delete cascade,
@@ -86,8 +91,9 @@ begin
   if octet_length(payload::text) > 300000 then return 'too big'; end if;
   select last_seen into seen from insights.installs where id = iid;
   if seen is not null and seen > now() - interval '1 hour' then return 'too soon'; end if;
-  -- A flood of new ids in one day: refuse more until tomorrow.
-  if seen is null and (select count(*) from insights.installs where created_at > now() - interval '1 day') > 20000
+  -- A flood of new ids in one day: refuse more until tomorrow (fake phones could
+  -- otherwise steer everyone's job picks).
+  if seen is null and (select count(*) from insights.installs where created_at > now() - interval '1 day') > 300
   then return 'busy'; end if;
 
   insert into insights.installs (id, app_version) values (iid, left(payload->>'app_version', 20))
@@ -123,7 +129,8 @@ begin
 
   delete from insights.exams where install_id = iid;
   insert into insights.exams (install_id, exam_id, exam_name, stage, status, from_feed)
-  select iid, left(e->>'exam_id', 60), left(e->>'exam_name', 120), left(e->>'stage', 40), left(e->>'status', 30),
+  select iid, left(e->>'exam_id', 60), left(e->>'exam_name', 120), coalesce(left(e->>'stage', 40), ''),
+         left(e->>'status', 30),
          (e->>'from_feed')::boolean
   from (select e from jsonb_array_elements(coalesce(payload->'exams', '[]')) e limit 100) t
   where coalesce(e->>'exam_name', '') <> ''

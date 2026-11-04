@@ -111,6 +111,9 @@ _GENERIC = {
 }  # fmt: skip
 
 
+# Exam names whose first word is an everyday word (same list as the app's _everydayCodes).
+_EVERYDAY = {"india", "indian", "delhi", "army", "navy", "state", "national", "union"}
+
 # A board's own words for its recruitments: RRB's "CEN", IBPS's "CRP".
 _MARKS = {"Railway Recruitment Boards": {"cen", "rrc"}, "Institute of Banking Personnel Selection": {"crp"}}
 
@@ -128,8 +131,13 @@ def board_named(title: str, exam: dict[str, Any]) -> bool:
     # (SSC is inside "UPSSSC", which is another board).
     joined = re.sub(r"[^a-z0-9]", "", title.lower())
     long_names = [re.sub(r"[^a-z0-9]", "", code), "".join(w for w in board if w not in _GENERIC)]
+    # An everyday first word ("India Post", "Delhi Police") counts only with the next one:
+    # "Bank of India" is not India Post.
+    name = exam["name"].lower().split()
+    spaced = " " + " ".join(re.findall(r"[a-z0-9]+", title.lower())) + " "
+    code_named = f" {' '.join(name[:2])} " in spaced if code in _EVERYDAY else code in words
     return (
-        code in words
+        code_named
         or bool(_MARKS.get(exam["board"], set()) & words)
         or (len(initials) >= 2 and initials in words)
         or any(w.rstrip("s") in stems for w in words)
