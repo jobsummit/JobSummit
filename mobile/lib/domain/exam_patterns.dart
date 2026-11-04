@@ -42,6 +42,13 @@ class ExamPattern {
         : null;
   }
 
+  /// The same paper: sections, counts, marks and time all match.
+  bool samePaper(ExamPattern o) =>
+      minutes == o.minutes &&
+      parts.length == o.parts.length &&
+      [for (final (i, x) in parts.indexed) x.section == o.parts[i].section && x.count == o.parts[i].count &&
+          x.plus == o.parts[i].plus && x.minus == o.parts[i].minus].every((same) => same);
+
   PracticePlan get plan => PracticePlan.pattern(id: id, title: '$name mock', parts: parts, minutes: minutes);
 }
 

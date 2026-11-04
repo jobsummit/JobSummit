@@ -32,7 +32,8 @@ class PracticeScreen extends ConsumerWidget {
     final yours = <(ExamPattern, TrackedApplication)>[];
     for (final app in ref.watch(activeAppsProvider)) {
       final p = patternFor(app);
-      if (p != null && !yours.any((y) => y.$1.id == p.id)) yours.add((p, app));
+      // One card per paper: NTPC Graduate and UG sit the same CBT-1.
+      if (p != null && !yours.any((y) => y.$1.samePaper(p))) yours.add((p, app));
     }
     final text = Theme.of(context).textTheme;
     return ListView(
@@ -215,7 +216,7 @@ class _PatternCard extends StatelessWidget {
         if (days != null && days >= 0) days == 0 ? 'exam today' : 'exam in $days day${days == 1 ? '' : 's'}',
       ].join(' · '),
       stats: practiceStats(pattern.plan.kind, history),
-      action: FilledButton(onPressed: () => PracticeTestScreen.open(context, pattern.plan), child: const Text('Start')),
+      action: Icon(Icons.chevron_right_rounded, color: AppPalette.textMuted),
       onTap: () => PracticeTestScreen.open(context, pattern.plan),
     );
   }

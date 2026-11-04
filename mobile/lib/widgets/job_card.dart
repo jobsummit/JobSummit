@@ -207,20 +207,26 @@ class _JobCardState extends ConsumerState<JobCard> {
           const SizedBox(height: 12),
           Row(
             children: [
-              if (item.applicationUrl != null) ...[
-                FilledButton.tonalIcon(
-                  onPressed: () => openExternal(context, item.applicationUrl),
-                  icon: const DuoIcon(AppIcon.applyOnline, size: 18),
-                  label: const Text('Apply online'),
+              // Wraps under itself with large text, so the two icons always fit.
+              Expanded(
+                child: Wrap(
+                  spacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (item.applicationUrl != null)
+                      FilledButton.tonalIcon(
+                        onPressed: () => openExternal(context, item.applicationUrl),
+                        icon: const DuoIcon(AppIcon.applyOnline, size: 18),
+                        label: const Text('Apply online'),
+                      ),
+                    TextButton.icon(
+                      onPressed: () => setState(() => _open = !_open),
+                      icon: Icon(_open ? Icons.expand_less_rounded : Icons.expand_more_rounded, size: 18),
+                      label: Text(_open ? 'Less' : 'Details'),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 4),
-              ],
-              TextButton.icon(
-                onPressed: () => setState(() => _open = !_open),
-                icon: Icon(_open ? Icons.expand_less_rounded : Icons.expand_more_rounded, size: 18),
-                label: Text(_open ? 'Less' : 'Details'),
               ),
-              const Spacer(),
               IconButton(
                 tooltip: 'Not for me',
                 onPressed: () => rejectJobWithUndo(widget.screenContext, ref, item),

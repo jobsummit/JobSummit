@@ -145,6 +145,11 @@ void main() {
       expect(patternById('ssc-mts-cbe')!.marking, isNull); // two sessions, two schemes
     });
 
+    test('NTPC Graduate and UG are one paper; CGL and CHSL are not', () {
+      expect(patternById('rrb-ntpc-graduate-cbt-1')!.samePaper(patternById('rrb-ntpc-ug-cbt-1')!), isTrue);
+      expect(patternById('ssc-cgl-tier-1')!.samePaper(patternById('ssc-chsl-tier-1')!), isFalse);
+    });
+
     test('the mock for the stage you track, none for a later one', () {
       expect(patternFor(app('SSC CGL 2026', tiers: ['Tier-1', 'Tier-2']))?.name, 'SSC CGL Tier-1');
       expect(patternFor(app('SSC CGL 2026', tiers: ['Tier-1', 'Tier-2'], tier: 1)), isNull);

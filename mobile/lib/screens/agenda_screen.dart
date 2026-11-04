@@ -158,8 +158,7 @@ class _BucketHeader extends StatelessWidget {
           const SizedBox(width: 8),
           Flexible(child: Text(label, style: text.titleSmall?.copyWith(fontWeight: FontWeight.w900))),
           if (count != null && count! > 1) ...[
-            const SizedBox(width: 6),
-            Text('$count', style: text.labelMedium?.copyWith(color: AppPalette.textMuted)),
+            Text(' · $count things', style: text.labelMedium?.copyWith(color: AppPalette.textMuted)),
           ],
           if (trailing != null) ...[const Spacer(), trailing!],
         ],

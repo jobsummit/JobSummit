@@ -297,8 +297,14 @@ class _Bento extends ConsumerWidget {
                     children: [
                       Icon(Icons.local_fire_department_rounded, color: AppPalette.honey, size: 26),
                       const SizedBox(height: 4),
-                      Text(streak == 1 ? '1 day' : '$streak days', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
-                      Text(xp.doneToday(now) ? 'streak · done for today' : 'streak · keep it going', style: text.labelSmall),
+                      // No streak yet: an invitation, not a zero.
+                      Text(streak == 0 ? 'Start a streak' : (streak == 1 ? '1 day' : '$streak days'),
+                          style: text.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
+                      Text(
+                          streak == 0
+                              ? 'one useful step today'
+                              : (xp.doneToday(now) ? 'streak · done for today' : 'streak · keep it going'),
+                          style: text.labelSmall),
                     ],
                   ),
                 ),
