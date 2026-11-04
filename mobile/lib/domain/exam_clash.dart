@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../models/exam_timeline.dart';
 import '../models/feed.dart';
 import '../models/tracked_application.dart';
+import 'agenda.dart';
 
 /// [sure]: both are one-day exams on the same day. Otherwise at least one is a
 /// window ("30 Sep – 30 Oct") and your own day is on the admit card: it may clash.
@@ -95,6 +96,5 @@ ExamClash? jobClash(FeedItem job, Iterable<TrackedApplication> apps, DateTime no
   return best;
 }
 
-const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-String _dm(DateTime d) => '${d.day} ${_months[d.month - 1]}';
+String _dm(DateTime d) => '${d.day} ${kShortMonths[d.month - 1]}';

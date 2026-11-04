@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/jobs_data.dart';
 import '../models/user_profile.dart';
+import 'agenda.dart';
 
 const kDefaultCategoryRelaxation = {'UR': 0, 'EWS': 0, 'OBC': 3, 'SC': 5, 'ST': 5};
 const kDefaultPwbdRelaxation = 10;
@@ -211,8 +212,7 @@ _Qual _evaluateQualification(UserProfileData p, PublishedPost post) {
 
 String _g(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toString();
 
-const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-String _d(DateTime d) => '${d.day.toString().padLeft(2, '0')} ${_months[d.month - 1]} ${d.year}';
+String _d(DateTime d) => '${d.day.toString().padLeft(2, '0')} ${kShortMonths[d.month - 1]} ${d.year}';
 
 // --- Main entry point -------------------------------------------------------------
 

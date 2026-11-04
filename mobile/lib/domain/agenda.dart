@@ -108,9 +108,10 @@ List<AgendaItem> buildAgenda({
   return items;
 }
 
-const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/// Short month names, for dates written out ('Sat 31 Oct').
+const kShortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-String _dm(DateTime d) => '${d.day} ${_months[d.month - 1]}';
+String _dm(DateTime d) => '${d.day} ${kShortMonths[d.month - 1]}';
 
 /// The Week view's buckets: today, tomorrow, each other day of the next week
 /// that has something, then "Later" for the rest.

@@ -1,6 +1,8 @@
 /// Time-blindness helpers: turn timestamps into a band + a human countdown.
 library;
 
+import 'agenda.dart';
+
 enum Urgency { safe, warning, urgent, info }
 
 const urgentWindow = Duration(hours: 72);
@@ -34,7 +36,6 @@ String countdownLabel(DateTime due, DateTime now) {
 }
 
 const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /// "Tue 14 Oct, 5:00 PM" in device-local time. No intl dependency needed.
 String formatDue(DateTime dt) {
@@ -42,5 +43,5 @@ String formatDue(DateTime dt) {
   final h12 = l.hour % 12 == 0 ? 12 : l.hour % 12;
   final mm = l.minute.toString().padLeft(2, '0');
   final ampm = l.hour < 12 ? 'AM' : 'PM';
-  return '${_weekdays[l.weekday - 1]} ${l.day} ${_months[l.month - 1]}, $h12:$mm $ampm';
+  return '${_weekdays[l.weekday - 1]} ${l.day} ${kShortMonths[l.month - 1]}, $h12:$mm $ampm';
 }

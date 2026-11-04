@@ -10,6 +10,7 @@ import '../models/job_preferences.dart';
 import '../models/jobs_data.dart';
 import 'qualification_taxonomy.dart';
 import 'requirements.dart';
+import 'fees.dart';
 
 // -----------------------------------------------------------------------------
 // Features: what a job "is", for learning from decisions
@@ -357,19 +358,7 @@ List<RankedJob> rankJobs(
 }
 
 /// "₹35,400/month" (Indian digit grouping).
-String formatPay(int rupees) {
-  final s = rupees.toString();
-  if (s.length <= 3) return '₹$s/month';
-  final last3 = s.substring(s.length - 3);
-  var rest = s.substring(0, s.length - 3);
-  final groups = <String>[];
-  while (rest.length > 2) {
-    groups.insert(0, rest.substring(rest.length - 2));
-    rest = rest.substring(0, rest.length - 2);
-  }
-  if (rest.isNotEmpty) groups.insert(0, rest);
-  return '₹${groups.join(',')},$last3/month';
-}
+String formatPay(int rupees) => '₹${groupIndian(rupees)}/month';
 
 /// The job's posts as published, for the details panel.
 List<PublishedPost> postsOf(FeedItem item) {

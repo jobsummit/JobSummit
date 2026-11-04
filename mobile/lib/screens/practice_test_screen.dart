@@ -18,6 +18,7 @@ import '../utils/system_actions.dart';
 import '../widgets/app_card.dart';
 import '../widgets/celebrate.dart';
 import '../widgets/common.dart';
+import '../domain/agenda.dart';
 
 /// One timed test: a question at a time, a clock that keeps running in the
 /// background, a palette to jump between questions, then marks and every answer
@@ -649,9 +650,8 @@ List<(PracticeSection, int, int)> _bySection(List<PracticeQuestion> qs, List<int
   return [for (final e in tally.entries) (e.key, e.value.$1, e.value.$2)];
 }
 
-const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /// "JobSummit Daily 10 · 24 Oct: 8/10 in 4:12" and the app's link.
 String dailyShareText(PracticeResult r, DateTime day) =>
-    'JobSummit Daily 10 · ${day.day} ${_months[day.month - 1]}: ${r.right}/${r.total} in '
+    'JobSummit Daily 10 · ${day.day} ${kShortMonths[day.month - 1]}: ${r.right}/${r.total} in '
     '${_mmss(Duration(seconds: r.seconds))}. Try today’s: ${Env.homePageUrl}';

@@ -16,7 +16,6 @@ const _monthNames = [
   'January', 'February', 'March', 'April', 'May', 'June', //
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
-const _short = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /// What's coming, by date: Week (one short list per day) or Month (a calendar;
 /// tap a day to see what's on it).
@@ -42,7 +41,7 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
     final selected = _selected ?? today;
     final weekEnd = today.add(const Duration(days: 6));
     final subtitle = view == AgendaView.week
-        ? 'This week · ${today.day} ${_short[today.month - 1]} – ${weekEnd.day} ${_short[weekEnd.month - 1]}'
+        ? 'This week · ${today.day} ${kShortMonths[today.month - 1]} – ${weekEnd.day} ${kShortMonths[weekEnd.month - 1]}'
         : '${_monthNames[month.month - 1]} ${month.year}';
 
     return RefreshIndicator(
@@ -119,7 +118,7 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
       const SizedBox(height: 16),
       Padding(
         padding: const EdgeInsets.only(left: 2, bottom: 8),
-        child: Text('${_weekday(selected)} ${selected.day} ${_short[selected.month - 1]}'.toUpperCase(),
+        child: Text('${_weekday(selected)} ${selected.day} ${kShortMonths[selected.month - 1]}'.toUpperCase(),
             style: text.labelMedium?.copyWith(color: AppPalette.textMuted, fontWeight: FontWeight.w900)),
       ),
       if (onDay.isEmpty) const MutedNote('Nothing on this day.') else _ItemsCard(items: onDay, now: now),
@@ -224,7 +223,7 @@ class _AgendaRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final text = Theme.of(context).textTheme;
     final color = _colorFor(item, now);
-    final sub = showDate ? '${item.at.day} ${_short[item.at.month - 1]} · ${item.subtitle}' : item.subtitle;
+    final sub = showDate ? '${item.at.day} ${kShortMonths[item.at.month - 1]} · ${item.subtitle}' : item.subtitle;
     final clash = item.kind == AgendaKind.exam && item.app != null
         ? ref.watch(examClashesProvider)[item.app!.id]?.firstOrNull
         : null;
@@ -372,7 +371,7 @@ class _DayCell extends StatelessWidget {
     return Semantics(
       button: true,
       selected: isSelected,
-      label: '${day.day} ${_short[day.month - 1]}${dots.isEmpty ? '' : ', ${dots.length} things'}',
+      label: '${day.day} ${kShortMonths[day.month - 1]}${dots.isEmpty ? '' : ', ${dots.length} things'}',
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,

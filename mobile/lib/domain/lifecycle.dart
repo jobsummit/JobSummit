@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/exam_timeline.dart';
 import '../models/tracked_application.dart';
+import 'agenda.dart';
 
 /// Applied → Admit card → Exam → Answer key → Result.
 enum LifecycleStage {
@@ -151,10 +152,9 @@ List<StageView> computeLifecycle(TrackedApplication app, ExamTimeline? t, DateTi
   ];
 }
 
-const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /// "14 Dec"
-String _d(DateTime d) => '${d.day} ${_months[d.month - 1]}';
+String _d(DateTime d) => '${d.day} ${kShortMonths[d.month - 1]}';
 
 /// "14 Dec" or "14 – 18 Dec" / "28 Nov – 3 Dec".
 String stageDateLabel(DateTime start, [DateTime? end]) {

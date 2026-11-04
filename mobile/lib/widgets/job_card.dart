@@ -25,6 +25,7 @@ import 'form_images_sheet.dart';
 import 'common.dart';
 import 'motion.dart';
 import 'pills.dart';
+import '../domain/agenda.dart';
 
 // -----------------------------------------------------------------------------
 // Actions shared by Today and Jobs
@@ -324,9 +325,8 @@ class JobDetails extends ConsumerWidget {
   }
 }
 
-const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-String _day(DateTime d) => '${d.day} ${_months[d.month - 1]} ${d.year}';
+String _day(DateTime d) => '${d.day} ${kShortMonths[d.month - 1]} ${d.year}';
 
 class _PostDetails extends StatefulWidget {
   const _PostDetails({required this.post, required this.category, required this.showName});

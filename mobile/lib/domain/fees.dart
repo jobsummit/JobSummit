@@ -22,11 +22,11 @@ int? feeFor(Map<String, int> fees, UserProfileData? profile) {
   return yours.reduce((a, b) => a < b ? a : b);
 }
 
-/// "₹500"
-String rupees(int amount) {
-  final s = '$amount';
-  if (s.length <= 3) return '₹$s';
-  // Indian grouping: 1,23,456.
+/// 1,23,456 (Indian digit grouping); negative numbers keep their sign.
+String groupIndian(int n) {
+  if (n < 0) return '-${groupIndian(-n)}';
+  final s = '$n';
+  if (s.length <= 3) return s;
   final last3 = s.substring(s.length - 3);
   var rest = s.substring(0, s.length - 3);
   final groups = <String>[];
@@ -35,8 +35,11 @@ String rupees(int amount) {
     rest = rest.substring(0, rest.length - 2);
   }
   if (rest.isNotEmpty) groups.insert(0, rest);
-  return '₹${groups.join(',')},$last3';
+  return '${groups.join(',')},$last3';
 }
+
+/// "₹500"
+String rupees(int amount) => '₹${groupIndian(amount)}';
 
 /// The table in one line, cheapest groups together: "UR/OBC/EWS ₹500 · SC/ST ₹250".
 String feeTable(Map<String, int> fees) {

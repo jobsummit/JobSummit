@@ -7,8 +7,8 @@ import '../../utils/system_actions.dart';
 import 'models.dart';
 import 'private_profile_screen.dart';
 import 'providers.dart';
+import '../../domain/agenda.dart';
 
-const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /// Settings › Profile in the Private workspace: its own profile, apart from the Govt one.
 class PrivateProfilePage extends ConsumerWidget {
@@ -71,7 +71,7 @@ class PrivateProfilePage extends ConsumerWidget {
         fact('Cities', list(p.cities, empty: 'Anywhere')),
         fact('Résumé', p.resumeName ?? 'Not added'),
         if (imported != null)
-          fact('LinkedIn', 'Filled in ${imported.day} ${_months[imported.month - 1]} ${imported.year}'),
+          fact('LinkedIn', 'Filled in ${imported.day} ${kShortMonths[imported.month - 1]} ${imported.year}'),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,

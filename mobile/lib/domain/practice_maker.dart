@@ -7,6 +7,7 @@ library;
 import 'dart:math';
 
 import 'practice.dart';
+import 'fees.dart';
 
 /// [n] questions for [section] (maths or reasoning), topics taken in turn.
 List<PracticeQuestion> makeQuestions(PracticeSection section, int n, Random r) {
@@ -83,21 +84,8 @@ T _one<T>(Random r, List<T> xs) => xs[r.nextInt(xs.length)];
 int _gcd(int a, int b) => b == 0 ? a.abs() : _gcd(b, a % b);
 int _lcm(int a, int b) => a ~/ _gcd(a, b) * b;
 
-/// 1,23,456 (Indian grouping).
-String _g(int n) {
-  if (n < 0) return '−${_g(-n)}';
-  final s = '$n';
-  if (s.length <= 3) return s;
-  final last3 = s.substring(s.length - 3);
-  var rest = s.substring(0, s.length - 3);
-  final groups = <String>[];
-  while (rest.length > 2) {
-    groups.insert(0, rest.substring(rest.length - 2));
-    rest = rest.substring(0, rest.length - 2);
-  }
-  if (rest.isNotEmpty) groups.insert(0, rest);
-  return '${groups.join(',')},$last3';
-}
+/// 1,23,456 (Indian grouping), with a typographic minus.
+String _g(int n) => n < 0 ? '−${groupIndian(-n)}' : groupIndian(n);
 
 String _rs(int n) => '₹${_g(n)}';
 

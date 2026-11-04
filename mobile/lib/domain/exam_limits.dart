@@ -14,6 +14,7 @@ import '../models/jobs_data.dart';
 import '../models/user_profile.dart';
 import 'eligibility.dart';
 import 'exam_catalog.dart';
+import 'agenda.dart';
 
 @immutable
 class AgeRule {
@@ -143,7 +144,7 @@ class ExamLimits {
 
   /// "Apply until 2029 · limit 35 (32 + 3 for OBC), counted on 1 Aug"
   String summary(DateTime now) {
-    final on = '${rule.day} ${_months[rule.month - 1]}';
+    final on = '${rule.day} ${kShortMonths[rule.month - 1]}';
     final limit = relaxation > 0 ? '$maxAge (${rule.max} + $relaxation)' : '$maxAge';
     if (lastYear == null) return 'Over the age limit ($limit on $on)';
     final from = firstYear != null && firstYear! > now.year ? 'From $firstYear until $lastYear' : 'Until $lastYear';
@@ -151,7 +152,6 @@ class ExamLimits {
   }
 }
 
-const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /// Your limits for [exam], or null when no rule is known. [jobs]: the job list
 /// (its newest notice of the exam wins over the usual rule).

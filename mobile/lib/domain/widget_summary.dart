@@ -28,14 +28,13 @@ class WidgetSummary {
 }
 
 const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 String _day(DateTime d, DateTime now) {
   final today = agendaDay(now);
   final day = agendaDay(d);
   if (day == today) return 'today';
   if (day == today.add(const Duration(days: 1))) return 'tomorrow';
-  return '${_weekdays[d.weekday - 1]} ${d.day} ${_months[d.month - 1]}';
+  return '${_weekdays[d.weekday - 1]} ${d.day} ${kShortMonths[d.month - 1]}';
 }
 
 WidgetSummary widgetSummary(List<AgendaItem> agenda, DateTime now, {List<PracticeResult> practice = const []}) {
