@@ -10,6 +10,6 @@ tzdata>=2024.2
 # Crawling
 httpx>=0.27,<1.0
 beautifulsoup4>=4.12,<5.0
-lxml>=5.3
+lxml>=6.1.3
 # Gemini token protection: send only relevant PDF pages (AGPL-3.0; see pdf_slicer.py)
 pymupdf>=1.24.10,<2.0
