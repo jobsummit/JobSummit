@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<title>JobSummit Privacy Policy</title>
+<style>
+  :root { --bg:#f7f6f2; --text:#22252b; --muted:#5d6370; --accent:#4a5fc1; --line:#e3e1da; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#16181d; --text:#e8e9ec; --muted:#a3a8b3; --accent:#9aa8ff; --line:#2e323b; } }
+  body { margin:0; background:var(--bg); color:var(--text); font:17px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:720px; margin:0 auto; padding:40px 16px 64px; }
+  h1 { font-size:1.8rem; margin:0 0 4px; }
+  h2 { font-size:1.15rem; margin:28px 0 6px; padding-top:12px; border-top:1px solid var(--line); }
+  .muted { color:var(--muted); }
+  a { color:var(--accent); }
+  ul { padding-left:20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Privacy policy</h1>
+  <p class="muted">JobSummit (Android app) · Last updated 24 October 2026</p>
+
+  <p>JobSummit helps you find Indian government and PSU jobs you are eligible for and keep track of your applications. It has no user accounts of its own. Your data stays on your phone (and in your own Google Drive, if you choose to back up), except the part shared to improve job picks, which you can turn off, as described below. This page explains what the app stores, what it shares, and where.</p>
+
+  <h2>Data stored on your phone</h2>
+  <ul>
+    <li><strong>Your profile:</strong> name, date of birth, reservation category, qualification and work experience. Used only on your phone to work out which jobs you are eligible for.</li>
+    <li><strong>Exams you track:</strong> exam and post names, dates, status, and notices found for them.</li>
+    <li><strong>Your job choices:</strong> which jobs you marked as applied or "not for me", and your job preferences (groups to show first or hide, minimum pay, languages). Used only on your phone to rank jobs for you.</li>
+    <li><strong>Saved IDs:</strong> registration numbers, roll numbers, notes, and portal passwords you choose to save. Passwords are kept in Android's encrypted storage.</li>
+    <li><strong>Practice:</strong> your test results, the questions you got wrong (to show them again), and the attempts you say you have used.</li>
+    <li><strong>Your exam score:</strong> if you paste your response sheet's link or open a saved copy, the app reads that page on your phone and keeps only your marks. The sheet itself is not stored or sent anywhere.</li>
+    <li><strong>Photos and signatures</strong> you pick to resize for a form stay on your phone, and are saved only where you choose.</li>
+  </ul>
+  <p>None of this leaves your phone, except your backup (if you sign in) and what is shared under <a href="#job-picks">Help improve job picks</a> while it is on.</p>
+
+  <h2>Google sign-in and Google Drive backup</h2>
+  <p>Signing in with Google is optional, and is used only for your backup. The app uses:</p>
+  <ul>
+    <li>the <strong>Google Drive app data folder</strong> (permission <code>drive.appdata</code>), a hidden folder in <em>your own</em> Google Drive that only this app can use; and</li>
+    <li>your Google account's <strong>name, email address and photo</strong>, which Google gives to any app you sign in to. They are used only on your phone, to show which account your backup belongs to and to notice if you sign in with a different one. They are never sent to the developer and are never part of the data you can share.</li>
+  </ul>
+  <p>The app stores one backup file there, containing the data listed above (including saved passwords), so it can be restored when you reinstall the app or move to a new phone. The app cannot see, read or change any other files in your Google Drive. The backup is protected by your Google account; the developer has no access to it.</p>
+  <p>JobSummit's use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements. Google user data is used only to provide the backup feature, is never sold, never used for advertising, and never shared with anyone.</p>
+
+  <h2 id="job-picks">Help improve job picks (on by default, you can turn it off)</h2>
+  <p>This is <strong>on unless you turn it off</strong> in Settings → Jobs → <em>Help improve job picks</em>. While it is on, the app sends the following to the JobSummit database, at most once a day and only when something changed:</p>
+  <ul>
+    <li><strong>About you, without who you are:</strong> your age range (for example 22–25, never your date of birth), reservation category, PwBD and ex-serviceman status, qualification level, degrees, the subjects you picked from the app's lists, and your years of experience as a range.</li>
+    <li><strong>Your job preferences:</strong> job groups you show first or hide, job types you hide, minimum pay and languages.</li>
+    <li><strong>Exams you track:</strong> each exam's name (as in the app's exam list when it is a known exam), stage and status.</li>
+    <li><strong>Your job choices:</strong> which jobs you applied to or turned down, with the job's group, board, kind of post, pay band and type.</li>
+  </ul>
+  <p>Each phone is known only by a random number made by the app. <strong>Never shared:</strong> your name, email address, date of birth, phone number, Google account details, registration and roll numbers, passwords, notes, photos, signatures, response sheets or practice results.</p>
+  <p><strong>Why:</strong> to learn which jobs people with a given degree and qualification tend to apply to, so the app can show everyone more relevant jobs first. The pipeline turns the shared choices into weights for groups of at least 5 people and publishes only those weights (and each job's career track) in the app's public data file <code>picks.json</code>; nothing about any single person is published. The data is not sold, not used for advertising and not shared with anyone else.</p>
+  <p><strong>Where:</strong> a database hosted by Supabase, which processes it for JobSummit. Only the JobSummit team can read it.</p>
+  <p><strong>How long:</strong> until you delete it, or 12 months after your phone last shared, whichever comes first.</p>
+  <p><strong>Your choice:</strong> turn the switch off at any time to stop sharing, or tap <em>Delete what I shared</em> in Settings → Jobs to delete everything your phone shared and stop sharing. If you uninstall the app first, ask through the contact below. If you turned sharing off, or said no when an earlier version asked, nothing is shared.</p>
+
+  <h2>Calendar and notifications</h2>
+  <p>If you allow it, the app adds deadlines and exam dates to your phone's calendar and shows notifications on your phone. This stays on your device and in your own calendar account.</p>
+
+  <h2>Information the app downloads</h2>
+  <p>The app downloads the public list of recruitment notifications and the practice question bank from GitHub (<code>github.io</code> and <code>githubusercontent.com</code>), and checks public exam websites for notices about exams you track. When you ask it to score a response sheet, it opens the link you gave. These requests contain no personal information. Like any website, those servers may see your IP address.</p>
+
+  <h2>Reviews you send</h2>
+  <p>Only if you use <em>Send a review</em>: your star rating, what you write, the email address you choose to add (optional), the app version and your phone's Android version and model are sent to the JobSummit team through Google Forms, and kept in the team's Google Sheet. Nothing else from your profile or exams is included. To have a review deleted, ask through the contact below.</p>
+
+  <h2>No advertising or tracking</h2>
+  <p>The app contains no advertising, no third-party analytics and no tracking across apps or websites. The only data it shares is what is described above, which you can turn off.</p>
+
+  <h2>Deleting your data</h2>
+  <ul>
+    <li>Delete a tracked exam in the app (⋮ → Delete): it is removed from your phone and from your backup.</li>
+    <li>Signing out keeps the backup in your Drive. To remove the backup and the app's access, open <a href="https://myaccount.google.com/connections">myaccount.google.com/connections</a>, choose JobSummit and remove its access, or delete the app's hidden data under Drive → Settings → Manage apps.</li>
+    <li>Shared data: Settings → Jobs → <em>Delete what I shared</em>.</li>
+    <li>Uninstalling the app deletes everything stored on the phone.</li>
+  </ul>
+
+  <h2>Children</h2>
+  <p>The app is meant for job and exam applicants and is not directed at children under 13.</p>
+
+  <h2>Changes and contact</h2>
+  <p>If this policy changes, the new version will be published on this page with a new date. Questions: open an issue at <a href="https://github.com/jobsummit/JobSummit/issues">github.com/jobsummit/JobSummit/issues</a>.</p>
+
+  <p><a href="./">← JobSummit home</a></p>
+</main>
+</body>
+</html>
